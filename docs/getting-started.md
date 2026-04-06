@@ -46,6 +46,22 @@ This gives you a stable summary of:
 4. Apps with multiple heads.
 5. Dependency hotspots.
 
+## First risk report
+
+To inspect the current forward migration plan:
+
+```bash
+python manage.py migration_inspect --risk
+```
+
+This reports:
+
+1. Pending migration count.
+2. Pending operation count.
+3. Overall severity.
+4. Rollback safety.
+5. Rule-triggered findings with recommendations.
+
 ## Machine-readable output
 
 JSON output is designed for CI and tooling:

@@ -6,13 +6,15 @@ The first implementation slice in this repository focuses on:
 
 1. Loading Django migration graphs into a typed internal model.
 2. Detecting merge nodes, multiple heads, root and leaf migrations, and dependency hotspots.
-3. Rendering deterministic text, JSON, Mermaid, and Graphviz DOT reports.
-4. Exposing a reusable `migration_inspect` Django management command.
+3. Analyzing the current forward migration plan with initial rule-driven risk scoring.
+4. Rendering deterministic text, JSON, Mermaid, and Graphviz DOT reports.
+5. Exposing a reusable `migration_inspect` Django management command.
 
 Example usage:
 
 ```bash
 python manage.py migration_inspect
+python manage.py migration_inspect --risk
 python manage.py migration_inspect --format json
 python manage.py migration_inspect --format mermaid
 python manage.py migration_inspect --format dot

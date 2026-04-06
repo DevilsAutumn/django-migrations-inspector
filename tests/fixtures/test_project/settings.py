@@ -10,6 +10,7 @@ MIDDLEWARE: list[str] = []
 INSTALLED_APPS = [
     "django_migration_inspector",
     "tests.fixtures.test_project.test_apps.analytics",
+    "tests.fixtures.test_project.test_apps.billing",
     "tests.fixtures.test_project.test_apps.catalog",
     "tests.fixtures.test_project.test_apps.inventory",
 ]
@@ -20,4 +21,3 @@ DATABASES = {
     }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-

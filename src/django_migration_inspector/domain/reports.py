@@ -7,8 +7,10 @@ from typing import TypedDict
 
 from django_migration_inspector.constants import REPORT_SCHEMA_VERSION
 
+from .enums import RiskSeverity
 from .keys import MigrationNodeKey, MigrationNodeKeyJSON
 from .models import MigrationNode, MigrationNodeJSON
+from .plans import ForwardMigrationPlan, PlannedMigrationStepJSON
 
 
 class AppHeadGroupJSON(TypedDict):
@@ -41,6 +43,34 @@ class GraphInspectionReportJSON(TypedDict):
     multiple_head_apps: list[AppHeadGroupJSON]
     dependency_hotspots: list[DependencyHotspotJSON]
     nodes: list[MigrationNodeJSON]
+
+
+class RiskFindingJSON(TypedDict):
+    """Stable JSON shape for risk findings."""
+
+    rule_id: str
+    severity: str
+    migration: MigrationNodeKeyJSON
+    operation_index: int
+    operation_name: str
+    message: str
+    recommendation: str
+
+
+class RiskAssessmentReportJSON(TypedDict):
+    """Stable JSON shape for risk assessment reports."""
+
+    schema_version: str
+    report_type: str
+    database_alias: str
+    selected_app_label: str | None
+    pending_migration_count: int
+    pending_operation_count: int
+    target_leaf_nodes: list[MigrationNodeKeyJSON]
+    overall_severity: str
+    rollback_safe: bool
+    findings: list[RiskFindingJSON]
+    planned_steps: list[PlannedMigrationStepJSON]
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,3 +145,71 @@ class GraphInspectionReport:
             "nodes": [node.to_json_dict() for node in self.nodes],
         }
 
+
+@dataclass(frozen=True, slots=True)
+class RiskFinding:
+    """One rule-triggered risk finding."""
+
+    rule_id: str
+    severity: RiskSeverity
+    migration: MigrationNodeKey
+    operation_index: int
+    operation_name: str
+    message: str
+    recommendation: str
+
+    def to_json_dict(self) -> RiskFindingJSON:
+        """Serialize the finding into the stable JSON contract."""
+
+        return {
+            "rule_id": self.rule_id,
+            "severity": self.severity.value,
+            "migration": self.migration.to_json_dict(),
+            "operation_index": self.operation_index,
+            "operation_name": self.operation_name,
+            "message": self.message,
+            "recommendation": self.recommendation,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RiskAssessmentReport:
+    """Output of the initial risk analysis engine."""
+
+    database_alias: str
+    selected_app_label: str | None
+    overall_severity: RiskSeverity
+    rollback_safe: bool
+    findings: tuple[RiskFinding, ...]
+    plan: ForwardMigrationPlan
+
+    @property
+    def pending_migration_count(self) -> int:
+        """Return the number of pending migration steps."""
+
+        return len(self.plan.steps)
+
+    @property
+    def pending_operation_count(self) -> int:
+        """Return the number of pending operations across the forward plan."""
+
+        return sum(step.operation_count for step in self.plan.steps)
+
+    def to_json_dict(self) -> RiskAssessmentReportJSON:
+        """Serialize the report into the stable JSON contract."""
+
+        return {
+            "schema_version": REPORT_SCHEMA_VERSION,
+            "report_type": "risk_assessment",
+            "database_alias": self.database_alias,
+            "selected_app_label": self.selected_app_label,
+            "pending_migration_count": self.pending_migration_count,
+            "pending_operation_count": self.pending_operation_count,
+            "target_leaf_nodes": [
+                target_leaf_node.to_json_dict() for target_leaf_node in self.plan.target_leaf_nodes
+            ],
+            "overall_severity": self.overall_severity.value,
+            "rollback_safe": self.rollback_safe,
+            "findings": [finding.to_json_dict() for finding in self.findings],
+            "planned_steps": [step.to_json_dict() for step in self.plan.steps],
+        }

@@ -13,8 +13,9 @@ The current implementation already provides:
 
 1. Typed migration graph loading.
 2. Graph intelligence reports for roots, leaves, merges, and conflict heads.
-3. Local-first visual outputs in text, JSON, Mermaid, and Graphviz DOT.
-4. A reusable Django management command that works in local development and CI.
+3. Initial rule-driven risk analysis for destructive and irreversible migration plans.
+4. Local-first visual outputs in text, JSON, Mermaid, and Graphviz DOT.
+5. A reusable Django management command that works in local development and CI.
 
 ## Why this toolkit exists
 
@@ -47,6 +48,6 @@ This docs site is set up to work with both:
 
 The next feature layers planned on top of the graph foundation are:
 
-1. Rule-driven risk analysis.
+1. Deeper risk rules and scoring.
 2. Rollback simulation.
 3. Environment snapshot export and drift comparison.

@@ -47,6 +47,11 @@ docs = [
   "mkdocs>=1.6.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/DevilsAutumn/django-migration-inspector"
+Repository = "https://github.com/DevilsAutumn/django-migration-inspector"
+Documentation = "https://devilsautumn.github.io/django-migration-inspector/"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/django_migration_inspector"]
 

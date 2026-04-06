@@ -9,8 +9,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django_migration_inspector.config import InspectConfig
 from django_migration_inspector.domain.enums import OutputFormat
 from django_migration_inspector.exceptions import DjangoMigrationInspectorError
-from django_migration_inspector.renderers import get_graph_report_renderer
-from django_migration_inspector.services import build_default_inspect_service
+from django_migration_inspector.renderers import (
+    get_graph_report_renderer,
+    get_risk_report_renderer,
+)
+from django_migration_inspector.services import (
+    build_default_inspect_service,
+    build_default_risk_service,
+)
 
 
 class Command(BaseCommand):
@@ -39,12 +45,18 @@ class Command(BaseCommand):
             default=None,
             help="Limit the report to one Django app label.",
         )
+        parser.add_argument(
+            "--risk",
+            action="store_true",
+            help="Analyze the pending forward migration plan and report deployment risk.",
+        )
 
     def handle(self, *args: object, **options: object) -> str | None:
         del args
 
         try:
             output_format = OutputFormat(str(options["format"]))
+            risk_mode = bool(options["risk"])
             database_alias = str(options["database"])
             raw_app_label = options["app_label"]
             app_label = None if raw_app_label in (None, "") else str(raw_app_label)
@@ -53,12 +65,21 @@ class Command(BaseCommand):
                 database_alias=database_alias,
                 app_label=app_label,
             )
-            service = build_default_inspect_service()
-            report = service.inspect_graph(config=config)
-            renderer = get_graph_report_renderer(output_format=output_format)
-            self.stdout.write(renderer.render(report), ending="")
+            if risk_mode:
+                if output_format in {OutputFormat.MERMAID, OutputFormat.DOT}:
+                    raise CommandError(
+                        "--risk currently supports only text and json output formats."
+                    )
+                risk_service = build_default_risk_service()
+                risk_report = risk_service.inspect_risk(config=config)
+                risk_renderer = get_risk_report_renderer(output_format=output_format)
+                self.stdout.write(risk_renderer.render(risk_report), ending="")
+            else:
+                graph_service = build_default_inspect_service()
+                graph_report = graph_service.inspect_graph(config=config)
+                graph_renderer = get_graph_report_renderer(output_format=output_format)
+                self.stdout.write(graph_renderer.render(graph_report), ending="")
         except DjangoMigrationInspectorError as error:
             raise CommandError(str(error)) from error
 
         return None
-

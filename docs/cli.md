@@ -8,6 +8,7 @@ Inspect the Django migration graph and emit a stable report.
 
 ```bash
 python manage.py migration_inspect
+python manage.py migration_inspect --risk
 ```
 
 ### Options
@@ -51,6 +52,23 @@ Choose the Django database alias used when loading migration state:
 ```bash
 python manage.py migration_inspect --database default
 ```
+
+#### `--risk`
+
+Analyze the pending forward migration plan rather than rendering the graph summary:
+
+```bash
+python manage.py migration_inspect --risk
+python manage.py migration_inspect --risk --format json
+python manage.py migration_inspect --risk --app billing
+```
+
+`--risk` currently supports:
+
+1. `text`
+2. `json`
+
+It does not currently support `mermaid` or `dot`.
 
 ## Output expectations
 

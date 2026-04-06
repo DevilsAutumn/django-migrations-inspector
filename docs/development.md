@@ -53,8 +53,10 @@ The current implementation is split into:
 3. `analyzers/`
    Pure graph intelligence logic.
 4. `renderers/`
-   Text, JSON, Mermaid, and DOT outputs.
+   Text, JSON, Mermaid, DOT, and risk-report outputs.
 5. `services/`
    Thin orchestration between providers and analyzers.
 6. `management/commands/`
    Django CLI entry points.
+7. `risk_rules/`
+   Built-in rule modules for destructive, custom, and data-migration checks.

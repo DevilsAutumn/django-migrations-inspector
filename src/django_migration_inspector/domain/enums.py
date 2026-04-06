@@ -14,6 +14,16 @@ class OutputFormat(str, Enum):
     DOT = "dot"
 
 
+class RiskSeverity(str, Enum):
+    """Supported migration risk severities."""
+
+    NONE = "none"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 class OperationCategory(str, Enum):
     """Normalized migration operation categories."""
 

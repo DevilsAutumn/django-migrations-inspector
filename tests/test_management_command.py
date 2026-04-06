@@ -17,7 +17,7 @@ def test_management_command_renders_json(django_db_blocker: DjangoDbBlocker) -> 
 
     report = json.loads(output.getvalue())
     assert report["report_type"] == "graph_inspection"
-    assert report["total_migrations"] == 8
+    assert report["total_migrations"] == 11
     assert report["multiple_head_apps"][0]["app_label"] == "analytics"
 
 

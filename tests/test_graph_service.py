@@ -16,7 +16,7 @@ def test_graph_service_detects_merge_nodes_and_multiple_heads(
     with django_db_blocker.unblock():
         report = service.inspect_graph(InspectConfig())
 
-    assert report.total_migrations == 8
+    assert report.total_migrations == 11
     assert [merge_node.identifier for merge_node in report.merge_nodes] == [
         "inventory.0003_merge_0002_add_sku_0002_add_status"
     ]
