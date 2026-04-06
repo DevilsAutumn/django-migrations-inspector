@@ -21,4 +21,5 @@ nav:
   - Getting Started: getting-started.md
   - CLI Reference: cli.md
   - Visualization: visualization.md
+  - Rollback Simulation: rollback.md
   - Development: development.md

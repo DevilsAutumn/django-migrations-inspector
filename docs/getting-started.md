@@ -62,6 +62,28 @@ This reports:
 4. Rollback safety.
 5. Rule-triggered findings with recommendations.
 
+## First rollback simulation
+
+To preview a rollback path:
+
+```bash
+python manage.py migration_inspect --rollback billing 0001_initial
+```
+
+To preview unapplying an app entirely:
+
+```bash
+python manage.py migration_inspect --rollback billing zero
+```
+
+This reports:
+
+1. Reverse migration order.
+2. Irreversible blockers.
+3. Cross-app rollback impact.
+4. Merge-topology concerns.
+5. Reverse operations in execution order.
+
 ## Machine-readable output
 
 JSON output is designed for CI and tooling:

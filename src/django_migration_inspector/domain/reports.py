@@ -10,7 +10,12 @@ from django_migration_inspector.constants import REPORT_SCHEMA_VERSION
 from .enums import RiskSeverity
 from .keys import MigrationNodeKey, MigrationNodeKeyJSON
 from .models import MigrationNode, MigrationNodeJSON
-from .plans import ForwardMigrationPlan, PlannedMigrationStepJSON
+from .plans import (
+    ForwardMigrationPlan,
+    PlannedMigrationStepJSON,
+    RollbackMigrationPlan,
+    RollbackMigrationStepJSON,
+)
 
 
 class AppHeadGroupJSON(TypedDict):
@@ -71,6 +76,47 @@ class RiskAssessmentReportJSON(TypedDict):
     rollback_safe: bool
     findings: list[RiskFindingJSON]
     planned_steps: list[PlannedMigrationStepJSON]
+
+
+class RollbackBlockerJSON(TypedDict):
+    """Stable JSON shape for rollback blockers."""
+
+    migration: MigrationNodeKeyJSON
+    operation_index: int
+    operation_name: str
+    message: str
+    recommendation: str
+
+
+class RollbackConcernJSON(TypedDict):
+    """Stable JSON shape for rollback concerns."""
+
+    category: str
+    severity: str
+    migration: MigrationNodeKeyJSON
+    operation_index: int | None
+    operation_name: str | None
+    message: str
+    recommendation: str
+
+
+class RollbackSimulationReportJSON(TypedDict):
+    """Stable JSON shape for rollback simulation reports."""
+
+    schema_version: str
+    report_type: str
+    database_alias: str
+    target_app_label: str
+    target_migration_name: str | None
+    target_identifier: str
+    step_count: int
+    affected_app_labels: list[str]
+    overall_severity: str
+    rollback_possible: bool
+    rollback_safe: bool
+    blockers: list[RollbackBlockerJSON]
+    concerns: list[RollbackConcernJSON]
+    planned_steps: list[RollbackMigrationStepJSON]
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,5 +256,92 @@ class RiskAssessmentReport:
             "overall_severity": self.overall_severity.value,
             "rollback_safe": self.rollback_safe,
             "findings": [finding.to_json_dict() for finding in self.findings],
+            "planned_steps": [step.to_json_dict() for step in self.plan.steps],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackBlocker:
+    """A blocker that prevents a clean rollback path."""
+
+    migration: MigrationNodeKey
+    operation_index: int
+    operation_name: str
+    message: str
+    recommendation: str
+
+    def to_json_dict(self) -> RollbackBlockerJSON:
+        """Serialize the blocker into the stable JSON contract."""
+
+        return {
+            "migration": self.migration.to_json_dict(),
+            "operation_index": self.operation_index,
+            "operation_name": self.operation_name,
+            "message": self.message,
+            "recommendation": self.recommendation,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackConcern:
+    """A non-blocking rollback concern that still needs review."""
+
+    category: str
+    severity: RiskSeverity
+    migration: MigrationNodeKey
+    operation_index: int | None
+    operation_name: str | None
+    message: str
+    recommendation: str
+
+    def to_json_dict(self) -> RollbackConcernJSON:
+        """Serialize the concern into the stable JSON contract."""
+
+        return {
+            "category": self.category,
+            "severity": self.severity.value,
+            "migration": self.migration.to_json_dict(),
+            "operation_index": self.operation_index,
+            "operation_name": self.operation_name,
+            "message": self.message,
+            "recommendation": self.recommendation,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackSimulationReport:
+    """Output of the rollback simulator."""
+
+    database_alias: str
+    overall_severity: RiskSeverity
+    rollback_possible: bool
+    rollback_safe: bool
+    blockers: tuple[RollbackBlocker, ...]
+    concerns: tuple[RollbackConcern, ...]
+    plan: RollbackMigrationPlan
+
+    @property
+    def step_count(self) -> int:
+        """Return the number of rollback steps."""
+
+        return len(self.plan.steps)
+
+    def to_json_dict(self) -> RollbackSimulationReportJSON:
+        """Serialize the report into the stable JSON contract."""
+
+        return {
+            "schema_version": REPORT_SCHEMA_VERSION,
+            "report_type": "rollback_simulation",
+            "database_alias": self.database_alias,
+            "target_app_label": self.plan.target_app_label,
+            "target_migration_name": self.plan.target_migration_name,
+            "target_identifier": self.plan.target_identifier,
+            "step_count": self.step_count,
+            "affected_app_labels": list(self.plan.affected_app_labels),
+            "overall_severity": self.overall_severity.value,
+            "rollback_possible": self.rollback_possible,
+            "rollback_safe": self.rollback_safe,
+            "blockers": [blocker.to_json_dict() for blocker in self.blockers],
+            "concerns": [concern.to_json_dict() for concern in self.concerns],
             "planned_steps": [step.to_json_dict() for step in self.plan.steps],
         }

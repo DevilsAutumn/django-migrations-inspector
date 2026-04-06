@@ -15,3 +15,13 @@ class InspectConfig:
     output_format: OutputFormat = OutputFormat.TEXT
     database_alias: str = DEFAULT_DATABASE_ALIAS
     app_label: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackConfig:
+    """Configuration for rollback simulation requests."""
+
+    output_format: OutputFormat = OutputFormat.TEXT
+    database_alias: str = DEFAULT_DATABASE_ALIAS
+    target_app_label: str = ""
+    target_migration_name: str = ""

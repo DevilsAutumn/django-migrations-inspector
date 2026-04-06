@@ -6,16 +6,18 @@ from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand, CommandError
 
-from django_migration_inspector.config import InspectConfig
+from django_migration_inspector.config import InspectConfig, RollbackConfig
 from django_migration_inspector.domain.enums import OutputFormat
 from django_migration_inspector.exceptions import DjangoMigrationInspectorError
 from django_migration_inspector.renderers import (
     get_graph_report_renderer,
     get_risk_report_renderer,
+    get_rollback_report_renderer,
 )
 from django_migration_inspector.services import (
     build_default_inspect_service,
     build_default_risk_service,
+    build_default_rollback_service,
 )
 
 
@@ -28,6 +30,7 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser: ArgumentParser) -> None:
+        mode_group = parser.add_mutually_exclusive_group()
         parser.add_argument(
             "--format",
             choices=[output_format.value for output_format in OutputFormat],
@@ -45,10 +48,19 @@ class Command(BaseCommand):
             default=None,
             help="Limit the report to one Django app label.",
         )
-        parser.add_argument(
+        mode_group.add_argument(
             "--risk",
             action="store_true",
             help="Analyze the pending forward migration plan and report deployment risk.",
+        )
+        mode_group.add_argument(
+            "--rollback",
+            nargs=2,
+            metavar=("APP_LABEL", "MIGRATION_NAME"),
+            help=(
+                "Simulate rollback to the requested migration target. Use 'zero' as the "
+                "migration name to simulate unapplying the entire app."
+            ),
         )
 
     def handle(self, *args: object, **options: object) -> str | None:
@@ -57,24 +69,53 @@ class Command(BaseCommand):
         try:
             output_format = OutputFormat(str(options["format"]))
             risk_mode = bool(options["risk"])
+            rollback_mode = options["rollback"]
             database_alias = str(options["database"])
             raw_app_label = options["app_label"]
             app_label = None if raw_app_label in (None, "") else str(raw_app_label)
-            config = InspectConfig(
-                output_format=output_format,
-                database_alias=database_alias,
-                app_label=app_label,
-            )
             if risk_mode:
                 if output_format in {OutputFormat.MERMAID, OutputFormat.DOT}:
                     raise CommandError(
                         "--risk currently supports only text and json output formats."
                     )
+                config = InspectConfig(
+                    output_format=output_format,
+                    database_alias=database_alias,
+                    app_label=app_label,
+                )
                 risk_service = build_default_risk_service()
                 risk_report = risk_service.inspect_risk(config=config)
                 risk_renderer = get_risk_report_renderer(output_format=output_format)
                 self.stdout.write(risk_renderer.render(risk_report), ending="")
+            elif rollback_mode is not None:
+                if app_label is not None:
+                    raise CommandError("--app cannot be used together with --rollback.")
+                if output_format in {OutputFormat.MERMAID, OutputFormat.DOT}:
+                    raise CommandError(
+                        "--rollback currently supports only text and json output formats."
+                    )
+                if not isinstance(rollback_mode, (list, tuple)) or len(rollback_mode) != 2:
+                    raise CommandError(
+                        "--rollback expects exactly two values: APP_LABEL and MIGRATION_NAME."
+                    )
+                target_app_label = str(rollback_mode[0])
+                target_migration_name = str(rollback_mode[1])
+                rollback_config = RollbackConfig(
+                    output_format=output_format,
+                    database_alias=database_alias,
+                    target_app_label=target_app_label,
+                    target_migration_name=target_migration_name,
+                )
+                rollback_service = build_default_rollback_service()
+                rollback_report = rollback_service.inspect_rollback(config=rollback_config)
+                rollback_renderer = get_rollback_report_renderer(output_format=output_format)
+                self.stdout.write(rollback_renderer.render(rollback_report), ending="")
             else:
+                config = InspectConfig(
+                    output_format=output_format,
+                    database_alias=database_alias,
+                    app_label=app_label,
+                )
                 graph_service = build_default_inspect_service()
                 graph_report = graph_service.inspect_graph(config=config)
                 graph_renderer = get_graph_report_renderer(output_format=output_format)

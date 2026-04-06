@@ -57,9 +57,9 @@ The current implementation is split into:
 2. `domain/`
    Immutable typed models and report contracts.
 3. `analyzers/`
-   Pure graph intelligence logic.
+   Pure graph intelligence, risk, and rollback logic.
 4. `renderers/`
-   Text, JSON, Mermaid, DOT, and risk-report outputs.
+   Text, JSON, Mermaid, DOT, risk-report, and rollback-report outputs.
 5. `services/`
    Thin orchestration between providers and analyzers.
 6. `management/commands/`

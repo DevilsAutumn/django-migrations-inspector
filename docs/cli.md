@@ -9,6 +9,7 @@ Inspect the Django migration graph and emit a stable report.
 ```bash
 python manage.py migration_inspect
 python manage.py migration_inspect --risk
+python manage.py migration_inspect --rollback billing 0001_initial
 ```
 
 ### Options
@@ -64,6 +65,23 @@ python manage.py migration_inspect --risk --app billing
 ```
 
 `--risk` currently supports:
+
+1. `text`
+2. `json`
+
+It does not currently support `mermaid` or `dot`.
+
+#### `--rollback APP_LABEL MIGRATION_NAME`
+
+Simulate rollback to a requested migration target:
+
+```bash
+python manage.py migration_inspect --rollback billing 0001_initial
+python manage.py migration_inspect --rollback billing zero
+python manage.py migration_inspect --rollback billing 0001_initial --format json
+```
+
+`--rollback` currently supports:
 
 1. `text`
 2. `json`

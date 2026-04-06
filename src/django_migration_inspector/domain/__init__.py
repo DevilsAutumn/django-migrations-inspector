@@ -3,13 +3,21 @@
 from .enums import OperationCategory, OutputFormat, RiskSeverity
 from .keys import MigrationNodeKey
 from .models import MigrationGraphSnapshot, MigrationNode, OperationDescriptor
-from .plans import ForwardMigrationPlan, PlannedMigrationStep
+from .plans import (
+    ForwardMigrationPlan,
+    PlannedMigrationStep,
+    RollbackMigrationPlan,
+    RollbackMigrationStep,
+)
 from .reports import (
     AppHeadGroup,
     DependencyHotspot,
     GraphInspectionReport,
     RiskAssessmentReport,
     RiskFinding,
+    RollbackBlocker,
+    RollbackConcern,
+    RollbackSimulationReport,
 )
 
 __all__ = [
@@ -27,4 +35,9 @@ __all__ = [
     "RiskAssessmentReport",
     "RiskFinding",
     "RiskSeverity",
+    "RollbackBlocker",
+    "RollbackConcern",
+    "RollbackMigrationPlan",
+    "RollbackMigrationStep",
+    "RollbackSimulationReport",
 ]
