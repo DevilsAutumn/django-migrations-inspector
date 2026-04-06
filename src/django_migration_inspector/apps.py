@@ -9,4 +9,3 @@ class DjangoMigrationInspectorConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "django_migration_inspector"
     verbose_name = "Django Migration Inspector"
-

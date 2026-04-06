@@ -44,4 +44,3 @@ def build_default_inspect_service() -> InspectService:
         graph_provider=DjangoMigrationGraphProvider(),
         graph_analyzer=GraphIntelligenceAnalyzer(),
     )
-

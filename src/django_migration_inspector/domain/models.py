@@ -121,4 +121,3 @@ class MigrationGraphSnapshot:
     app_labels: tuple[str, ...]
     root_nodes: tuple[MigrationNodeKey, ...]
     leaf_nodes: tuple[MigrationNodeKey, ...]
-

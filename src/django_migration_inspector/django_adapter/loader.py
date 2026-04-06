@@ -25,4 +25,3 @@ def load_migration_loader(database_alias: str) -> MigrationLoader:
 
     connection = get_database_connection(database_alias)
     return MigrationLoader(connection=connection, ignore_no_migrations=True)
-

@@ -42,9 +42,7 @@ class DotGraphReportRenderer:
                 is_merge=node.key in merge_keys,
                 is_conflict_head=node.key in multiple_head_keys,
             )
-            lines.append(
-                f'  "{escape_dot_label(node.key.identifier)}" [{", ".join(attributes)}];'
-            )
+            lines.append(f'  "{escape_dot_label(node.key.identifier)}" [{", ".join(attributes)}];')
 
         for dependency, target in build_visible_edges(report):
             dependency_label = escape_dot_label(dependency.identifier)

@@ -55,4 +55,3 @@ class ForwardMigrationPlan:
     selected_app_label: str | None
     target_leaf_nodes: tuple[MigrationNodeKey, ...]
     steps: tuple[PlannedMigrationStep, ...]
-

@@ -139,8 +139,7 @@ class GraphInspectionReport:
                 app_head_group.to_json_dict() for app_head_group in self.multiple_head_apps
             ],
             "dependency_hotspots": [
-                dependency_hotspot.to_json_dict()
-                for dependency_hotspot in self.dependency_hotspots
+                dependency_hotspot.to_json_dict() for dependency_hotspot in self.dependency_hotspots
             ],
             "nodes": [node.to_json_dict() for node in self.nodes],
         }

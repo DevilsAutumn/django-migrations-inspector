@@ -15,4 +15,3 @@ class InspectConfig:
     output_format: OutputFormat = OutputFormat.TEXT
     database_alias: str = DEFAULT_DATABASE_ALIAS
     app_label: str | None = None
-

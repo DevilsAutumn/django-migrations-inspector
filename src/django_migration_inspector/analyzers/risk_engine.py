@@ -46,16 +46,11 @@ class RiskEngine:
         """Analyze the plan with all configured risk rules."""
 
         findings = tuple(
-            finding
-            for step in plan.steps
-            for rule in self.rules
-            for finding in rule.evaluate(step)
+            finding for step in plan.steps for rule in self.rules for finding in rule.evaluate(step)
         )
         overall_severity = self._calculate_overall_severity(findings=findings)
         rollback_safe = all(
-            operation.is_reversible
-            for step in plan.steps
-            for operation in step.operations
+            operation.is_reversible for step in plan.steps for operation in step.operations
         )
         return RiskAssessmentReport(
             database_alias=plan.database_alias,

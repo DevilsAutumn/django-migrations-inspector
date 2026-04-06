@@ -11,4 +11,3 @@ class UnsupportedDjangoVersionError(DjangoMigrationInspectorError):
 
 class MigrationInspectionError(DjangoMigrationInspectorError):
     """Raised when migration inspection cannot complete safely."""
-

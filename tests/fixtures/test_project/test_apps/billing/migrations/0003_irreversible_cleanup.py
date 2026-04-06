@@ -16,6 +16,4 @@ def cleanup_invoices(apps: object, schema_editor: object) -> None:
 class Migration(migrations.Migration):
     dependencies: ClassVar[tuple[tuple[str, str], ...]] = (("billing", "0002_remove_reference"),)
 
-    operations: ClassVar[tuple[Operation, ...]] = (
-        migrations.RunPython(cleanup_invoices),
-    )
+    operations: ClassVar[tuple[Operation, ...]] = (migrations.RunPython(cleanup_invoices),)

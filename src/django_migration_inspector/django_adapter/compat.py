@@ -29,4 +29,3 @@ def validate_supported_django_version() -> None:
             f"{MAX_SUPPORTED_DJANGO_VERSION_EXCLUSIVE[0]}.0. "
             f"Detected Django {get_version()}."
         )
-

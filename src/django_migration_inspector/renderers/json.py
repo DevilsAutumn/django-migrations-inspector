@@ -18,4 +18,3 @@ class JsonGraphReportRenderer:
         """Render the graph report into JSON."""
 
         return json.dumps(report.to_json_dict(), indent=self.indent) + "\n"
-

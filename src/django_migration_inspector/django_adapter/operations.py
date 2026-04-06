@@ -64,4 +64,3 @@ def build_operation_descriptor(operation: Operation, index: int) -> OperationDes
         is_reversible=bool(operation.reversible),
         is_elidable=bool(operation.elidable),
     )
-
