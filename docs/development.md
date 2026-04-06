@@ -17,10 +17,16 @@ python -m pip install -e '.[dev]'
 Run all core checks before merging:
 
 ```bash
+ruff format .
+ruff format --check .
 ruff check .
 mypy src tests
 pytest -q
+mkdocs build --strict
 ```
+
+The repository also includes a GitHub Actions workflow at `.github/workflows/ci.yml` that
+enforces the same checks on pushes and pull requests.
 
 ## Documentation workflow
 

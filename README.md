@@ -33,3 +33,13 @@ python -m pip install '.[docs]'
 mkdocs serve
 mkdocs build --strict
 ```
+
+Local quality commands:
+
+```bash
+ruff format .
+ruff format --check .
+ruff check .
+mypy src tests
+pytest -q
+```
