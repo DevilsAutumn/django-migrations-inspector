@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+from pathlib import Path
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -130,10 +131,11 @@ def test_management_command_renders_rollback_json(
     assert report["report_type"] == "rollback_simulation"
     assert report["rollback_possible"] is False
     assert report["overall_severity"] == "critical"
+    assert "dependencies" in report["planned_steps"][0]
     assert any(blocker["operation_name"] == "RunPython" for blocker in report["blockers"])
 
 
-def test_management_command_renders_rollback_text(
+def test_management_command_renders_rollback_text_summary(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:
     output = StringIO()
@@ -157,8 +159,132 @@ def test_management_command_renders_rollback_text(
     rendered = output.getvalue()
     assert "Target: inventory.0001_initial" in rendered
     assert "Affected apps: catalog, inventory" in rendered
-    assert "inventory.0003_merge_0002_add_sku_0002_add_status [merge]" in rendered
+    assert "Detail modes:" in rendered
+    assert "Why other apps are included:" in rendered
+    assert (
+        "catalog: catalog.0001_initial depends on "
+        "inventory.0003_merge_0002_add_sku_0002_add_status" in rendered
+    )
+    assert "Detailed rollback steps:" in rendered
+    assert "hidden in summary mode" in rendered
+    assert "RemoveField: Remove field sku from widget" not in rendered
+
+
+def test_management_command_renders_verbose_rollback_text(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+            ("catalog", "0001_initial"),
+        )
+        call_command(
+            "migration_inspect",
+            "--rollback",
+            "inventory",
+            "0001_initial",
+            "--verbose",
+            stdout=output,
+        )
+
+    rendered = output.getvalue()
+    assert "Rollback steps:" in rendered
+    assert "inventory.0003_merge_0002_add_sku_0002_add_status (0 operations, merge)" in rendered
+    assert "catalog.0001_initial (1 operation)" in rendered
+    assert "All concerns:" in rendered
+
+
+def test_management_command_renders_rollback_operations_when_requested(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        call_command(
+            "migration_inspect",
+            "--rollback",
+            "inventory",
+            "zero",
+            "--show-operations",
+            stdout=output,
+        )
+
+    rendered = output.getvalue()
+    assert "Rollback steps:" in rendered
     assert "RemoveField: Remove field sku from widget" in rendered
+    assert "DeleteModel: Delete model Widget" in rendered
+
+
+def test_management_command_explains_one_rollback_app(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+            ("catalog", "0001_initial"),
+        )
+        call_command(
+            "migration_inspect",
+            "--rollback",
+            "inventory",
+            "0001_initial",
+            "--why-app",
+            "catalog",
+            stdout=output,
+        )
+
+    rendered = output.getvalue()
+    assert "Why catalog is included:" in rendered
+    assert (
+        "catalog.0001_initial depends on "
+        "inventory.0003_merge_0002_add_sku_0002_add_status" in rendered
+    )
+
+
+def test_management_command_writes_rollback_output_to_file(
+    django_db_blocker: DjangoDbBlocker,
+    tmp_path: Path,
+) -> None:
+    output = StringIO()
+    output_path = tmp_path / "rollback-summary.txt"
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+            ("catalog", "0001_initial"),
+        )
+        call_command(
+            "migration_inspect",
+            "--rollback",
+            "inventory",
+            "0001_initial",
+            "--output",
+            str(output_path),
+            stdout=output,
+        )
+
+    assert output.getvalue() == ""
+    written_report = output_path.read_text(encoding="utf-8")
+    assert "Target: inventory.0001_initial" in written_report
 
 
 def test_management_command_rejects_visual_rollback_format(

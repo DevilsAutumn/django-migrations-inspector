@@ -17,6 +17,8 @@ python manage.py migration_inspect
 python manage.py migration_inspect --risk
 python manage.py migration_inspect --risk-history
 python manage.py migration_inspect --rollback billing 0001_initial
+python manage.py migration_inspect --rollback users zero
+python manage.py migration_inspect --rollback users zero --why-app trips
 python manage.py migration_inspect --format json
 python manage.py migration_inspect --format mermaid
 python manage.py migration_inspect --format dot

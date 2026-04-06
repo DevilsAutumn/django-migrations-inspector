@@ -27,6 +27,7 @@ class RollbackMigrationStepJSON(TypedDict):
     key: MigrationNodeKeyJSON
     module: str
     file_path: str | None
+    dependencies: list[MigrationNodeKeyJSON]
     operation_count: int
     is_merge: bool
     has_irreversible_operation: bool
@@ -92,6 +93,7 @@ class RollbackMigrationStep:
     key: MigrationNodeKey
     module: str
     file_path: Path | None
+    dependencies: tuple[MigrationNodeKey, ...]
     is_merge: bool
     reverse_operations: tuple[RollbackOperationDescriptor, ...]
 
@@ -114,6 +116,7 @@ class RollbackMigrationStep:
             "key": self.key.to_json_dict(),
             "module": self.module,
             "file_path": None if self.file_path is None else str(self.file_path),
+            "dependencies": [dependency.to_json_dict() for dependency in self.dependencies],
             "operation_count": self.operation_count,
             "is_merge": self.is_merge,
             "has_irreversible_operation": self.has_irreversible_operation,

@@ -24,6 +24,16 @@ JSON output is also supported:
 python manage.py migration_inspect --rollback billing 0001_initial --format json
 ```
 
+For larger projects, the text output is summary-first by default:
+
+```bash
+python manage.py migration_inspect --rollback users zero
+python manage.py migration_inspect --rollback users zero --verbose
+python manage.py migration_inspect --rollback users zero --show-operations
+python manage.py migration_inspect --rollback users zero --why-app trips
+python manage.py migration_inspect --rollback users zero --output users-rollback.txt
+```
+
 ## What the report includes
 
 The simulator currently reports:
@@ -34,7 +44,22 @@ The simulator currently reports:
 4. Irreversible blockers.
 5. Cross-app impact caused by dependencies.
 6. Merge-migration warnings.
-7. Reverse operations in execution order.
+7. App-level impact summaries.
+8. Reverse operations in execution order when requested.
+
+## Output modes
+
+The default text output is designed for large rollback plans:
+
+1. Header summary with blocker and concern counts
+2. Critical blockers
+3. Why other apps are included
+4. App impact summary
+5. Top risky migrations
+
+Use `--verbose` to include the full step list and concern list.
+Use `--show-operations` to include reverse operations under each step.
+Use `--why-app APP_LABEL` to focus on one dependency chain.
 
 ## Current blocker behavior
 

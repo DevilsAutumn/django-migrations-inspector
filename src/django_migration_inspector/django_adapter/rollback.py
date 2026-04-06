@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from django.db.migrations.executor import MigrationExecutor
+from django.db.migrations.graph import Node
 from django.db.migrations.migration import Migration
 
 from django_migration_inspector.django_adapter.compat import validate_supported_django_version
@@ -36,6 +37,15 @@ def _migration_exists(executor: MigrationExecutor, *, app_label: str, migration_
 
 def _is_merge_migration(migration: Migration) -> bool:
     return sum(dependency[0] == migration.app_label for dependency in migration.dependencies) > 1
+
+
+def _sorted_dependencies(parent_nodes: set[Node]) -> tuple[MigrationNodeKey, ...]:
+    return tuple(
+        sorted(
+            (MigrationNodeKey.from_tuple(parent_node.key) for parent_node in parent_nodes),
+            key=lambda key: (key.app_label, key.migration_name),
+        )
+    )
 
 
 @dataclass(slots=True)
@@ -85,7 +95,12 @@ class DjangoRollbackPlanProvider:
             )
 
         steps = tuple(
-            self._build_rollback_step(migration=migration)
+            self._build_rollback_step(
+                migration=migration,
+                parent_nodes=executor.loader.graph.node_map[
+                    (migration.app_label, migration.name)
+                ].parents,
+            )
             for migration, backwards in migration_plan
             if backwards
         )
@@ -96,7 +111,12 @@ class DjangoRollbackPlanProvider:
             steps=steps,
         )
 
-    def _build_rollback_step(self, *, migration: Migration) -> RollbackMigrationStep:
+    def _build_rollback_step(
+        self,
+        *,
+        migration: Migration,
+        parent_nodes: set[Node],
+    ) -> RollbackMigrationStep:
         reverse_operations = tuple(
             build_rollback_operation_descriptor(operation=operation, index=index)
             for index, operation in reversed(tuple(enumerate(migration.operations)))
@@ -108,6 +128,7 @@ class DjangoRollbackPlanProvider:
             ),
             module=module_name,
             file_path=_resolve_module_path(module_name),
+            dependencies=_sorted_dependencies(parent_nodes),
             is_merge=_is_merge_migration(migration),
             reverse_operations=reverse_operations,
         )
