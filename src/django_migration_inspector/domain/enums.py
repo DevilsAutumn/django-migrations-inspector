@@ -24,6 +24,13 @@ class RiskSeverity(str, Enum):
     CRITICAL = "critical"
 
 
+class RiskAnalysisScope(str, Enum):
+    """Supported scopes for risk analysis."""
+
+    PENDING = "pending"
+    HISTORY = "history"
+
+
 class OperationCategory(str, Enum):
     """Normalized migration operation categories."""
 

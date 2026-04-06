@@ -1,4 +1,4 @@
-"""Typed forward migration plan models."""
+"""Typed forward and rollback migration plan models."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
 
+from .enums import OperationCategory, RiskAnalysisScope
 from .keys import MigrationNodeKey, MigrationNodeKeyJSON
 from .models import OperationDescriptor, OperationDescriptorJSON
 
@@ -29,7 +30,21 @@ class RollbackMigrationStepJSON(TypedDict):
     operation_count: int
     is_merge: bool
     has_irreversible_operation: bool
-    reverse_operations: list[OperationDescriptorJSON]
+    reverse_operations: list[RollbackOperationDescriptorJSON]
+
+
+class RollbackOperationDescriptorJSON(TypedDict):
+    """Stable JSON shape for reverse operation descriptors."""
+
+    index: int
+    name: str
+    source_name: str
+    import_path: str
+    category: str
+    description: str
+    source_description: str
+    is_reversible: bool
+    is_elidable: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +80,7 @@ class ForwardMigrationPlan:
 
     database_alias: str
     selected_app_label: str | None
+    scope: RiskAnalysisScope
     target_leaf_nodes: tuple[MigrationNodeKey, ...]
     steps: tuple[PlannedMigrationStep, ...]
 
@@ -77,7 +93,7 @@ class RollbackMigrationStep:
     module: str
     file_path: Path | None
     is_merge: bool
-    reverse_operations: tuple[OperationDescriptor, ...]
+    reverse_operations: tuple[RollbackOperationDescriptor, ...]
 
     @property
     def operation_count(self) -> int:
@@ -104,6 +120,36 @@ class RollbackMigrationStep:
             "reverse_operations": [
                 operation.to_json_dict() for operation in self.reverse_operations
             ],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackOperationDescriptor:
+    """Normalized description of one reverse migration operation."""
+
+    index: int
+    name: str
+    source_name: str
+    import_path: str
+    category: OperationCategory
+    description: str
+    source_description: str
+    is_reversible: bool
+    is_elidable: bool
+
+    def to_json_dict(self) -> RollbackOperationDescriptorJSON:
+        """Serialize the reverse operation into the rollback JSON contract."""
+
+        return {
+            "index": self.index,
+            "name": self.name,
+            "source_name": self.source_name,
+            "import_path": self.import_path,
+            "category": self.category.value,
+            "description": self.description,
+            "source_description": self.source_description,
+            "is_reversible": self.is_reversible,
+            "is_elidable": self.is_elidable,
         }
 
 

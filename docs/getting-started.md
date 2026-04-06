@@ -62,6 +62,13 @@ This reports:
 4. Rollback safety.
 5. Rule-triggered findings with recommendations.
 
+To audit migration files already on disk, even when nothing is pending:
+
+```bash
+python manage.py migration_inspect --risk-history
+python manage.py migration_inspect --risk-history --app billing
+```
+
 ## First rollback simulation
 
 To preview a rollback path:

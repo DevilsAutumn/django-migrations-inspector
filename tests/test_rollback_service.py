@@ -68,6 +68,41 @@ def test_rollback_service_surfaces_cross_app_impact(
     assert report.rollback_possible is True
     assert "catalog" in report.plan.affected_app_labels
     assert any(concern.category == "cross_app_impact" for concern in report.concerns)
+    merge_flags = {step.key.identifier: step.is_merge for step in report.plan.steps}
+    assert merge_flags["inventory.0003_merge_0002_add_sku_0002_add_status"] is True
+    assert merge_flags["inventory.0002_add_sku"] is False
+    assert merge_flags["inventory.0002_add_status"] is False
+
+
+def test_rollback_service_uses_reverse_operation_labels(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    service = build_default_rollback_service()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        report = service.inspect_rollback(
+            RollbackConfig(target_app_label="inventory", target_migration_name="zero")
+        )
+
+    operations_by_step = {
+        step.key.identifier: tuple(operation.name for operation in step.reverse_operations)
+        for step in report.plan.steps
+    }
+    descriptions_by_step = {
+        step.key.identifier: tuple(operation.description for operation in step.reverse_operations)
+        for step in report.plan.steps
+    }
+
+    assert operations_by_step["inventory.0002_add_sku"] == ("RemoveField",)
+    assert descriptions_by_step["inventory.0002_add_sku"] == ("Remove field sku from widget",)
+    assert operations_by_step["inventory.0001_initial"] == ("DeleteModel",)
+    assert descriptions_by_step["inventory.0001_initial"] == ("Delete model Widget",)
 
 
 def test_management_command_renders_rollback_json(
@@ -123,6 +158,7 @@ def test_management_command_renders_rollback_text(
     assert "Target: inventory.0001_initial" in rendered
     assert "Affected apps: catalog, inventory" in rendered
     assert "inventory.0003_merge_0002_add_sku_0002_add_status [merge]" in rendered
+    assert "RemoveField: Remove field sku from widget" in rendered
 
 
 def test_management_command_rejects_visual_rollback_format(

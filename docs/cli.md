@@ -9,6 +9,7 @@ Inspect the Django migration graph and emit a stable report.
 ```bash
 python manage.py migration_inspect
 python manage.py migration_inspect --risk
+python manage.py migration_inspect --risk-history
 python manage.py migration_inspect --rollback billing 0001_initial
 ```
 
@@ -65,6 +66,26 @@ python manage.py migration_inspect --risk --app billing
 ```
 
 `--risk` currently supports:
+
+1. `text`
+2. `json`
+
+It does not currently support `mermaid` or `dot`.
+
+When there are no pending migrations, `--risk` now prints a note explaining that it only checked unapplied forward steps.
+Use `--risk-history` to audit the migrations already present on disk.
+
+#### `--risk-history`
+
+Audit all visible migrations on disk rather than only the pending forward plan:
+
+```bash
+python manage.py migration_inspect --risk-history
+python manage.py migration_inspect --risk-history --format json
+python manage.py migration_inspect --risk-history --app billing
+```
+
+`--risk-history` currently supports:
 
 1. `text`
 2. `json`

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .constants import DEFAULT_DATABASE_ALIAS
-from .domain.enums import OutputFormat
+from .domain.enums import OutputFormat, RiskAnalysisScope
 
 
 @dataclass(frozen=True, slots=True)
@@ -15,6 +15,16 @@ class InspectConfig:
     output_format: OutputFormat = OutputFormat.TEXT
     database_alias: str = DEFAULT_DATABASE_ALIAS
     app_label: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RiskConfig:
+    """Configuration for risk inspection requests."""
+
+    output_format: OutputFormat = OutputFormat.TEXT
+    database_alias: str = DEFAULT_DATABASE_ALIAS
+    app_label: str | None = None
+    scope: RiskAnalysisScope = RiskAnalysisScope.PENDING
 
 
 @dataclass(frozen=True, slots=True)

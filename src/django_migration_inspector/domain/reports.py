@@ -7,7 +7,7 @@ from typing import TypedDict
 
 from django_migration_inspector.constants import REPORT_SCHEMA_VERSION
 
-from .enums import RiskSeverity
+from .enums import RiskAnalysisScope, RiskSeverity
 from .keys import MigrationNodeKey, MigrationNodeKeyJSON
 from .models import MigrationNode, MigrationNodeJSON
 from .plans import (
@@ -69,6 +69,10 @@ class RiskAssessmentReportJSON(TypedDict):
     report_type: str
     database_alias: str
     selected_app_label: str | None
+    analysis_scope: str
+    affected_app_labels: list[str]
+    analyzed_migration_count: int
+    analyzed_operation_count: int
     pending_migration_count: int
     pending_operation_count: int
     target_leaf_nodes: list[MigrationNodeKeyJSON]
@@ -229,16 +233,44 @@ class RiskAssessmentReport:
     plan: ForwardMigrationPlan
 
     @property
+    def analysis_scope(self) -> RiskAnalysisScope:
+        """Return which migration slice this report analyzed."""
+
+        return self.plan.scope
+
+    @property
+    def analyzed_migration_count(self) -> int:
+        """Return the number of analyzed migration steps."""
+
+        return len(self.plan.steps)
+
+    @property
+    def affected_app_labels(self) -> tuple[str, ...]:
+        """Return the app labels touched by the analyzed plan."""
+
+        return tuple(sorted({step.key.app_label for step in self.plan.steps}))
+
+    @property
+    def analyzed_operation_count(self) -> int:
+        """Return the number of analyzed operations across all steps."""
+
+        return sum(step.operation_count for step in self.plan.steps)
+
+    @property
     def pending_migration_count(self) -> int:
         """Return the number of pending migration steps."""
 
-        return len(self.plan.steps)
+        if self.analysis_scope is RiskAnalysisScope.PENDING:
+            return self.analyzed_migration_count
+        return 0
 
     @property
     def pending_operation_count(self) -> int:
         """Return the number of pending operations across the forward plan."""
 
-        return sum(step.operation_count for step in self.plan.steps)
+        if self.analysis_scope is RiskAnalysisScope.PENDING:
+            return self.analyzed_operation_count
+        return 0
 
     def to_json_dict(self) -> RiskAssessmentReportJSON:
         """Serialize the report into the stable JSON contract."""
@@ -248,6 +280,10 @@ class RiskAssessmentReport:
             "report_type": "risk_assessment",
             "database_alias": self.database_alias,
             "selected_app_label": self.selected_app_label,
+            "analysis_scope": self.analysis_scope.value,
+            "affected_app_labels": list(self.affected_app_labels),
+            "analyzed_migration_count": self.analyzed_migration_count,
+            "analyzed_operation_count": self.analyzed_operation_count,
             "pending_migration_count": self.pending_migration_count,
             "pending_operation_count": self.pending_operation_count,
             "target_leaf_nodes": [

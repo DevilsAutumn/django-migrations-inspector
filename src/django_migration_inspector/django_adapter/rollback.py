@@ -11,7 +11,9 @@ from django.db.migrations.migration import Migration
 
 from django_migration_inspector.django_adapter.compat import validate_supported_django_version
 from django_migration_inspector.django_adapter.loader import get_database_connection
-from django_migration_inspector.django_adapter.operations import build_operation_descriptor
+from django_migration_inspector.django_adapter.operations import (
+    build_rollback_operation_descriptor,
+)
 from django_migration_inspector.domain.keys import MigrationNodeKey
 from django_migration_inspector.domain.plans import (
     RollbackMigrationPlan,
@@ -30,6 +32,10 @@ def _resolve_module_path(module_name: str) -> Path | None:
 
 def _migration_exists(executor: MigrationExecutor, *, app_label: str, migration_name: str) -> bool:
     return (app_label, migration_name) in executor.loader.disk_migrations
+
+
+def _is_merge_migration(migration: Migration) -> bool:
+    return sum(dependency[0] == migration.app_label for dependency in migration.dependencies) > 1
 
 
 @dataclass(slots=True)
@@ -92,7 +98,7 @@ class DjangoRollbackPlanProvider:
 
     def _build_rollback_step(self, *, migration: Migration) -> RollbackMigrationStep:
         reverse_operations = tuple(
-            build_operation_descriptor(operation=operation, index=index)
+            build_rollback_operation_descriptor(operation=operation, index=index)
             for index, operation in reversed(tuple(enumerate(migration.operations)))
         )
         module_name = str(migration.__module__)
@@ -102,6 +108,6 @@ class DjangoRollbackPlanProvider:
             ),
             module=module_name,
             file_path=_resolve_module_path(module_name),
-            is_merge=len(migration.dependencies) > 1,
+            is_merge=_is_merge_migration(migration),
             reverse_operations=reverse_operations,
         )

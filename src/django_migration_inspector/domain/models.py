@@ -81,7 +81,9 @@ class MigrationNode:
     def is_merge(self) -> bool:
         """Return whether the migration merges multiple parents."""
 
-        return len(self.dependencies) > 1
+        return (
+            sum(dependency.app_label == self.key.app_label for dependency in self.dependencies) > 1
+        )
 
     @property
     def dependency_count(self) -> int:

@@ -27,6 +27,11 @@ class MigrationNodeKey:
 
         return f"{self.app_label}.{self.migration_name}"
 
+    def to_tuple(self) -> tuple[str, str]:
+        """Return the key in Django's native tuple shape."""
+
+        return (self.app_label, self.migration_name)
+
     @classmethod
     def from_tuple(cls, raw_key: tuple[str, str]) -> MigrationNodeKey:
         """Create a domain key from a Django migration tuple."""

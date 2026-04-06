@@ -6,8 +6,8 @@ from argparse import ArgumentParser
 
 from django.core.management.base import BaseCommand, CommandError
 
-from django_migration_inspector.config import InspectConfig, RollbackConfig
-from django_migration_inspector.domain.enums import OutputFormat
+from django_migration_inspector.config import InspectConfig, RiskConfig, RollbackConfig
+from django_migration_inspector.domain.enums import OutputFormat, RiskAnalysisScope
 from django_migration_inspector.exceptions import DjangoMigrationInspectorError
 from django_migration_inspector.renderers import (
     get_graph_report_renderer,
@@ -54,6 +54,11 @@ class Command(BaseCommand):
             help="Analyze the pending forward migration plan and report deployment risk.",
         )
         mode_group.add_argument(
+            "--risk-history",
+            action="store_true",
+            help="Audit all visible migrations on disk and report historical risk.",
+        )
+        mode_group.add_argument(
             "--rollback",
             nargs=2,
             metavar=("APP_LABEL", "MIGRATION_NAME"),
@@ -69,22 +74,28 @@ class Command(BaseCommand):
         try:
             output_format = OutputFormat(str(options["format"]))
             risk_mode = bool(options["risk"])
+            risk_history_mode = bool(options["risk_history"])
             rollback_mode = options["rollback"]
             database_alias = str(options["database"])
             raw_app_label = options["app_label"]
             app_label = None if raw_app_label in (None, "") else str(raw_app_label)
-            if risk_mode:
+            if risk_mode or risk_history_mode:
                 if output_format in {OutputFormat.MERMAID, OutputFormat.DOT}:
                     raise CommandError(
-                        "--risk currently supports only text and json output formats."
+                        "Risk analysis currently supports only text and json output formats."
                     )
-                config = InspectConfig(
+                risk_config = RiskConfig(
                     output_format=output_format,
                     database_alias=database_alias,
                     app_label=app_label,
+                    scope=(
+                        RiskAnalysisScope.HISTORY
+                        if risk_history_mode
+                        else RiskAnalysisScope.PENDING
+                    ),
                 )
                 risk_service = build_default_risk_service()
-                risk_report = risk_service.inspect_risk(config=config)
+                risk_report = risk_service.inspect_risk(config=risk_config)
                 risk_renderer = get_risk_report_renderer(output_format=output_format)
                 self.stdout.write(risk_renderer.render(risk_report), ending="")
             elif rollback_mode is not None:
@@ -111,13 +122,13 @@ class Command(BaseCommand):
                 rollback_renderer = get_rollback_report_renderer(output_format=output_format)
                 self.stdout.write(rollback_renderer.render(rollback_report), ending="")
             else:
-                config = InspectConfig(
+                inspect_config = InspectConfig(
                     output_format=output_format,
                     database_alias=database_alias,
                     app_label=app_label,
                 )
                 graph_service = build_default_inspect_service()
-                graph_report = graph_service.inspect_graph(config=config)
+                graph_report = graph_service.inspect_graph(config=inspect_config)
                 graph_renderer = get_graph_report_renderer(output_format=output_format)
                 self.stdout.write(graph_renderer.render(graph_report), ending="")
         except DjangoMigrationInspectorError as error:

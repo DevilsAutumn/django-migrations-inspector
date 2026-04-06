@@ -59,7 +59,7 @@ class RollbackSimulator:
                     RollbackBlocker(
                         migration=step.key,
                         operation_index=operation.index,
-                        operation_name=operation.name,
+                        operation_name=operation.source_name,
                         message=(
                             "This reverse step is irreversible, so Django cannot execute a clean "
                             "rollback through this migration."
@@ -131,14 +131,14 @@ class RollbackSimulator:
     ) -> list[RollbackConcern]:
         concerns: list[RollbackConcern] = []
         for operation in step.reverse_operations:
-            if operation.name == "RemoveField":
+            if operation.source_name == "RemoveField":
                 concerns.append(
                     RollbackConcern(
                         category="data_loss_reversal",
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
-                        operation_name=operation.name,
+                        operation_name=operation.source_name,
                         message=(
                             "Reversing a field removal restores schema shape but cannot recover "
                             "the dropped field data automatically."
@@ -149,14 +149,14 @@ class RollbackSimulator:
                         ),
                     )
                 )
-            elif operation.name == "DeleteModel":
+            elif operation.source_name == "DeleteModel":
                 concerns.append(
                     RollbackConcern(
                         category="table_restore",
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
-                        operation_name=operation.name,
+                        operation_name=operation.source_name,
                         message=(
                             "Reversing a model deletion can recreate the table structure but does "
                             "not restore deleted rows."
@@ -167,14 +167,14 @@ class RollbackSimulator:
                         ),
                     )
                 )
-            elif operation.name == "RunPython":
+            elif operation.source_name == "RunPython":
                 concerns.append(
                     RollbackConcern(
                         category="reverse_data_migration",
                         severity=RiskSeverity.MEDIUM,
                         migration=step.key,
                         operation_index=operation.index,
-                        operation_name=operation.name,
+                        operation_name=operation.source_name,
                         message=(
                             "Rollback includes custom Python data logic, which may still be slow "
                             "or operationally risky even when technically reversible."
@@ -185,14 +185,14 @@ class RollbackSimulator:
                         ),
                     )
                 )
-            elif operation.name == "RunSQL":
+            elif operation.source_name == "RunSQL":
                 concerns.append(
                     RollbackConcern(
                         category="reverse_sql",
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
-                        operation_name=operation.name,
+                        operation_name=operation.source_name,
                         message=(
                             "Rollback includes raw SQL, which may have backend-specific lock or "
                             "transaction behavior."
