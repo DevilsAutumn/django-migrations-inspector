@@ -1,0 +1,1 @@
+"""Analytics fixture app."""

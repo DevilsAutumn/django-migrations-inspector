@@ -1,0 +1,2 @@
+"""Fixture Django project package."""
+

@@ -1,0 +1,103 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-migration-inspector"
+version = "0.1.0"
+description = "migration safety toolkit for Django."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Open Source Contributors" },
+]
+keywords = ["django", "migrations", "database", "devtools", "schema"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: Django",
+  "Framework :: Django :: 4.2",
+  "Framework :: Django :: 5.0",
+  "Framework :: Django :: 5.1",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Database",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "Django>=4.2,<6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "coverage[toml]>=7.6.0",
+  "django-stubs[compatible-mypy]>=5.1.0",
+  "mypy>=1.11.2",
+  "pytest>=8.3.3",
+  "pytest-django>=4.9.0",
+  "ruff>=0.6.9",
+]
+docs = [
+  "mkdocs>=1.6.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/django_migration_inspector"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.fixtures.test_project.settings"
+pythonpath = [
+  ".",
+  "src",
+]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "A",
+  "ANN",
+  "B",
+  "C4",
+  "E",
+  "F",
+  "I",
+  "N",
+  "PIE",
+  "PTH",
+  "RET",
+  "RUF",
+  "SIM",
+  "TRY",
+  "UP",
+]
+ignore = [
+  "TRY003",
+]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+pretty = true
+show_error_codes = true
+warn_unused_configs = true
+plugins = ["mypy_django_plugin.main"]
+mypy_path = ["src", "."]
+
+[tool.django-stubs]
+django_settings_module = "tests.fixtures.test_project.settings"
+
+[tool.coverage.run]
+branch = true
+source = ["django_migration_inspector"]
