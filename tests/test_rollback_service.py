@@ -14,6 +14,7 @@ from pytest_django.plugin import DjangoDbBlocker
 
 from django_migration_inspector.config import RollbackConfig
 from django_migration_inspector.domain.enums import RiskSeverity
+from django_migration_inspector.exceptions import MigrationInspectionError
 from django_migration_inspector.services import build_default_rollback_service
 
 
@@ -106,6 +107,48 @@ def test_rollback_service_uses_reverse_operation_labels(
     assert descriptions_by_step["inventory.0001_initial"] == ("Delete model Widget",)
 
 
+def test_rollback_service_accepts_unique_migration_prefix(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    service = build_default_rollback_service()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("billing", "0001_initial"),
+            ("billing", "0002_remove_reference"),
+            ("billing", "0003_irreversible_cleanup"),
+        )
+        report = service.inspect_rollback(
+            RollbackConfig(target_app_label="billing", target_migration_name="0001")
+        )
+
+    assert report.plan.target_identifier == "billing.0001_initial"
+
+
+def test_rollback_service_rejects_ambiguous_migration_prefix(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    service = build_default_rollback_service()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        try:
+            service.inspect_rollback(
+                RollbackConfig(target_app_label="inventory", target_migration_name="0002")
+            )
+        except MigrationInspectionError as error:
+            assert "is ambiguous" in str(error)
+            assert "0002_add_sku" in str(error)
+            assert "0002_add_status" in str(error)
+        else:
+            raise AssertionError("Expected ambiguous rollback migration prefix to fail.")
+
+
 def test_management_command_renders_rollback_json(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:
@@ -119,7 +162,7 @@ def test_management_command_renders_rollback_json(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "billing",
             "0001_initial",
             "--format",
@@ -133,6 +176,43 @@ def test_management_command_renders_rollback_json(
     assert report["overall_severity"] == "critical"
     assert "dependencies" in report["planned_steps"][0]
     assert any(blocker["operation_name"] == "RunPython" for blocker in report["blockers"])
+
+
+def test_management_command_supports_rollback_subcommand(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        call_command("migration_inspect", "rollback", "inventory", "zero", stdout=output)
+
+    rendered = output.getvalue()
+    assert "Target: inventory.zero" in rendered
+    assert "Decision: REVIEW REQUIRED" in rendered
+    assert "Next step:" in rendered
+
+
+def test_management_command_supports_rollback_migration_prefix(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("billing", "0001_initial"),
+            ("billing", "0002_remove_reference"),
+            ("billing", "0003_irreversible_cleanup"),
+        )
+        call_command("migration_inspect", "rollback", "billing", "0001", stdout=output)
+
+    rendered = output.getvalue()
+    assert "Target: billing.0001_initial" in rendered
 
 
 def test_management_command_renders_rollback_text_summary(
@@ -150,7 +230,7 @@ def test_management_command_renders_rollback_text_summary(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "inventory",
             "0001_initial",
             stdout=output,
@@ -158,15 +238,14 @@ def test_management_command_renders_rollback_text_summary(
 
     rendered = output.getvalue()
     assert "Target: inventory.0001_initial" in rendered
-    assert "Affected apps: catalog, inventory" in rendered
-    assert "Detail modes:" in rendered
+    assert "Blast radius:" in rendered
+    assert "Summary:" in rendered
     assert "Why other apps are included:" in rendered
     assert (
         "catalog: catalog.0001_initial depends on "
         "inventory.0003_merge_0002_add_sku_0002_add_status" in rendered
     )
-    assert "Detailed rollback steps:" in rendered
-    assert "hidden in summary mode" in rendered
+    assert "Next step:" in rendered
     assert "RemoveField: Remove field sku from widget" not in rendered
 
 
@@ -185,10 +264,10 @@ def test_management_command_renders_verbose_rollback_text(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "inventory",
             "0001_initial",
-            "--verbose",
+            "--details",
             stdout=output,
         )
 
@@ -213,7 +292,7 @@ def test_management_command_renders_rollback_operations_when_requested(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "inventory",
             "zero",
             "--show-operations",
@@ -241,7 +320,7 @@ def test_management_command_explains_one_rollback_app(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "inventory",
             "0001_initial",
             "--why-app",
@@ -274,7 +353,7 @@ def test_management_command_writes_rollback_output_to_file(
         )
         call_command(
             "migration_inspect",
-            "--rollback",
+            "rollback",
             "inventory",
             "0001_initial",
             "--output",
@@ -296,7 +375,7 @@ def test_management_command_rejects_visual_rollback_format(
         try:
             call_command(
                 "migration_inspect",
-                "--rollback",
+                "rollback",
                 "billing",
                 "0001_initial",
                 "--format",
@@ -307,3 +386,17 @@ def test_management_command_rejects_visual_rollback_format(
             assert "supports only text and json" in str(error)
         else:
             raise AssertionError("Expected rollback mode with DOT output to fail.")
+
+
+def test_management_command_rejects_missing_rollback_subcommand_args(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        try:
+            call_command("migration_inspect", "rollback", "inventory", stdout=output)
+        except CommandError as error:
+            assert "expects exactly two positional arguments" in str(error)
+        else:
+            raise AssertionError("Expected rollback subcommand with one arg to fail.")

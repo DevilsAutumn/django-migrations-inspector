@@ -10,6 +10,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.graph import MigrationGraph
 from django.db.migrations.migration import Migration
 
+from django_migration_inspector.django_adapter.app_ignore import build_ignored_app_labels
 from django_migration_inspector.django_adapter.compat import validate_supported_django_version
 from django_migration_inspector.django_adapter.loader import get_database_connection
 from django_migration_inspector.django_adapter.operations import build_operation_descriptor
@@ -75,6 +76,30 @@ def _generate_historical_plan_keys(
     return tuple(ordered_keys)
 
 
+def _filter_target_leaf_nodes(
+    *,
+    target_leaf_nodes: tuple[MigrationNodeKey, ...],
+    ignored_app_labels: frozenset[str],
+) -> tuple[MigrationNodeKey, ...]:
+    return tuple(
+        target_leaf_node
+        for target_leaf_node in target_leaf_nodes
+        if target_leaf_node.app_label not in ignored_app_labels
+    )
+
+
+def _validate_selected_app_label(
+    *,
+    app_label: str | None,
+    ignored_app_labels: frozenset[str],
+) -> None:
+    if app_label is None or app_label not in ignored_app_labels:
+        return
+    raise MigrationInspectionError(
+        f"App {app_label!r} is ignored because it is not a user project app."
+    )
+
+
 @dataclass(slots=True)
 class DjangoForwardPlanProvider:
     """Build a normalized forward migration plan using Django's executor."""
@@ -88,16 +113,24 @@ class DjangoForwardPlanProvider:
         """Build the current forward migration plan for the requested scope."""
 
         validate_supported_django_version()
+        ignored_app_labels = build_ignored_app_labels()
+        _validate_selected_app_label(
+            app_label=app_label,
+            ignored_app_labels=ignored_app_labels,
+        )
         connection = get_database_connection(database_alias)
         executor = MigrationExecutor(connection=connection)
-        target_leaf_nodes = _build_target_leaf_nodes(executor=executor, app_label=app_label)
+        target_leaf_nodes = _filter_target_leaf_nodes(
+            target_leaf_nodes=_build_target_leaf_nodes(executor=executor, app_label=app_label),
+            ignored_app_labels=ignored_app_labels,
+        )
         migration_plan = executor.migration_plan(
             tuple(target.to_tuple() for target in target_leaf_nodes)
         )
         planned_steps = tuple(
             self._build_planned_step(migration=migration)
             for migration, backwards in migration_plan
-            if not backwards
+            if not backwards and migration.app_label not in ignored_app_labels
         )
         return ForwardMigrationPlan(
             database_alias=database_alias,
@@ -138,9 +171,17 @@ class DjangoHistoricalPlanProvider:
         """Build the full migration-history plan for the requested scope."""
 
         validate_supported_django_version()
+        ignored_app_labels = build_ignored_app_labels()
+        _validate_selected_app_label(
+            app_label=app_label,
+            ignored_app_labels=ignored_app_labels,
+        )
         connection = get_database_connection(database_alias)
         executor = MigrationExecutor(connection=connection)
-        target_leaf_nodes = _build_target_leaf_nodes(executor=executor, app_label=app_label)
+        target_leaf_nodes = _filter_target_leaf_nodes(
+            target_leaf_nodes=_build_target_leaf_nodes(executor=executor, app_label=app_label),
+            ignored_app_labels=ignored_app_labels,
+        )
         planned_steps = tuple(
             DjangoForwardPlanProvider()._build_planned_step(
                 migration=executor.loader.graph.nodes[migration_key]
@@ -149,6 +190,7 @@ class DjangoHistoricalPlanProvider:
                 graph=executor.loader.graph,
                 targets=target_leaf_nodes,
             )
+            if migration_key[0] not in ignored_app_labels
         )
         return ForwardMigrationPlan(
             database_alias=database_alias,

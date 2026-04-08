@@ -38,35 +38,49 @@ Run the graph inspection command from your Django project:
 python manage.py migration_inspect
 ```
 
+By default, the command ignores Django built-in apps and third-party apps so the report focuses on
+your project code.
+
 This gives you a stable summary of:
 
-1. Root migrations.
-2. Leaf migrations.
-3. Merge migrations.
-4. Apps with multiple heads.
-5. Dependency hotspots.
+1. Whether the visible graph needs attention.
+2. Which apps have multiple heads.
+3. Which merge migrations exist.
+4. Which nodes are dependency hotspots.
+
+Use `--details` when you want the root and leaf migration lists too:
+
+```bash
+python manage.py migration_inspect --details
+```
 
 ## First risk report
 
 To inspect the current forward migration plan:
 
 ```bash
-python manage.py migration_inspect --risk
+python manage.py migration_inspect risk
 ```
 
 This reports:
 
-1. Pending migration count.
-2. Pending operation count.
-3. Overall severity.
-4. Rollback safety.
-5. Rule-triggered findings with recommendations.
+1. Whether rollback is blocked.
+2. Which pending migrations are destructive.
+3. Which migrations need manual review.
+4. Which apps need attention first.
+
+Use `--details` for the full per-operation finding list:
+
+```bash
+python manage.py migration_inspect risk --details
+```
 
 To audit migration files already on disk, even when nothing is pending:
 
 ```bash
-python manage.py migration_inspect --risk-history
-python manage.py migration_inspect --risk-history --app billing
+python manage.py migration_inspect audit
+python manage.py migration_inspect audit --app billing
+python manage.py migration_inspect audit --details
 ```
 
 ## First rollback simulation
@@ -74,29 +88,30 @@ python manage.py migration_inspect --risk-history --app billing
 To preview a rollback path:
 
 ```bash
-python manage.py migration_inspect --rollback billing 0001_initial
+python manage.py migration_inspect rollback billing 0001_initial
 ```
 
 To preview unapplying an app entirely:
 
 ```bash
-python manage.py migration_inspect --rollback billing zero
+python manage.py migration_inspect rollback billing zero
 ```
 
 This reports:
 
-1. Reverse migration order.
-2. Irreversible blockers.
-3. Cross-app rollback impact.
-4. Merge-topology concerns.
-5. Reverse operations in execution order.
+1. Whether rollback is blocked, risky, or clear.
+2. The rollback blast radius across steps and apps.
+3. Which migrations lose data on reversal.
+4. Why other apps are included.
+
+Use `--details` or `--show-operations` when you need the full rollback plan.
 
 ## Machine-readable output
 
 JSON output is designed for CI and tooling:
 
 ```bash
-python manage.py migration_inspect --format json
+python manage.py migration_inspect --json
 ```
 
 ## Visual output

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django_migration_inspector.domain.enums import OperationCategory, RiskSeverity
+from django_migration_inspector.domain.enums import (
+    OperationCategory,
+    RiskFindingKind,
+    RiskSeverity,
+)
 from django_migration_inspector.domain.plans import PlannedMigrationStep
 from django_migration_inspector.domain.reports import RiskFinding
 
@@ -24,6 +28,7 @@ class UnknownOperationRule:
             findings.append(
                 RiskFinding(
                     rule_id=self.rule_id,
+                    kind=RiskFindingKind.REVIEW,
                     severity=RiskSeverity.MEDIUM,
                     migration=step.key,
                     operation_index=operation.index,

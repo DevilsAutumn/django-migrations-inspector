@@ -36,7 +36,7 @@ def test_management_command_renders_risk_json(django_db_blocker: DjangoDbBlocker
     output = StringIO()
 
     with django_db_blocker.unblock():
-        call_command("migration_inspect", "--risk", "--format", "json", stdout=output)
+        call_command("migration_inspect", "risk", "--json", stdout=output)
 
     report = json.loads(output.getvalue())
     assert report["report_type"] == "risk_assessment"
@@ -47,19 +47,45 @@ def test_management_command_renders_risk_json(django_db_blocker: DjangoDbBlocker
     assert any(finding["operation_name"] == "RunPython" for finding in report["findings"])
 
 
+def test_management_command_supports_risk_subcommand(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        call_command("migration_inspect", "risk", "--app", "billing", stdout=output)
+
+    rendered = output.getvalue()
+    assert "Scope: billing" in rendered
+    assert "Decision: ROLLBACK BLOCKED" in rendered
+    assert "Pending migrations:" in rendered
+
+
+def test_management_command_supports_audit_subcommand_json(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        call_command("migration_inspect", "audit", "--json", stdout=output)
+
+    report = json.loads(output.getvalue())
+    assert report["report_type"] == "risk_assessment"
+    assert report["analysis_scope"] == "history"
+
+
 def test_management_command_renders_risk_text_for_one_app(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:
     output = StringIO()
 
     with django_db_blocker.unblock():
-        call_command("migration_inspect", "--risk", "--app", "billing", stdout=output)
+        call_command("migration_inspect", "risk", "--app", "billing", stdout=output)
 
     rendered = output.getvalue()
-    assert "Analysis scope: pending" in rendered
-    assert "Affected apps: billing" in rendered
-    assert "Overall risk: HIGH" in rendered
-    assert "Rollback safe: NO" in rendered
+    assert "Decision: ROLLBACK BLOCKED" in rendered
+    assert "Summary:" in rendered
+    assert "contain destructive schema changes" in rendered
     assert "billing.0002_remove_reference" in rendered
     assert "billing.0003_irreversible_cleanup" in rendered
 
@@ -72,11 +98,10 @@ def test_management_command_renders_historical_risk_json(
     with django_db_blocker.unblock():
         call_command(
             "migration_inspect",
-            "--risk-history",
+            "audit",
             "--app",
             "billing",
-            "--format",
-            "json",
+            "--json",
             stdout=output,
         )
 
@@ -97,7 +122,7 @@ def test_management_command_rejects_visual_risk_format(
         try:
             call_command(
                 "migration_inspect",
-                "--risk",
+                "risk",
                 "--format",
                 "mermaid",
                 stdout=output,
@@ -106,6 +131,20 @@ def test_management_command_rejects_visual_risk_format(
             assert "supports only text and json" in str(error)
         else:
             raise AssertionError("Expected risk mode with Mermaid output to fail.")
+
+
+def test_management_command_rejects_legacy_risk_flag(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        try:
+            call_command("migration_inspect", "--risk", stdout=output)
+        except Exception as error:
+            assert "unrecognized arguments: --risk" in str(error)
+        else:
+            raise AssertionError("Expected legacy risk flag syntax to fail.")
 
 
 def test_text_risk_renderer_explains_empty_pending_plan() -> None:
@@ -127,6 +166,7 @@ def test_text_risk_renderer_explains_empty_pending_plan() -> None:
 
     rendered = renderer.render(report)
 
-    assert "Affected apps: none" in rendered
+    assert "Decision: CLEAR" in rendered
     assert "Pending migrations: 0" in rendered
-    assert "Use --risk-history to audit migration files already on disk." in rendered
+    assert "No pending migrations need review in the selected scope." in rendered
+    assert "migration_inspect audit" in rendered

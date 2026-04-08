@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import cast
 
-from django_migration_inspector.domain.enums import RiskSeverity
+from django_migration_inspector.domain.enums import RiskFindingKind, RiskSeverity
 from django_migration_inspector.domain.plans import ForwardMigrationPlan
 from django_migration_inspector.domain.reports import RiskAssessmentReport, RiskFinding
 from django_migration_inspector.risk_rules import (
@@ -49,8 +49,9 @@ class RiskEngine:
             finding for step in plan.steps for rule in self.rules for finding in rule.evaluate(step)
         )
         overall_severity = self._calculate_overall_severity(findings=findings)
-        rollback_safe = all(
-            operation.is_reversible for step in plan.steps for operation in step.operations
+        rollback_safe = not any(
+            finding.kind in {RiskFindingKind.BLOCKED, RiskFindingKind.DESTRUCTIVE}
+            for finding in findings
         )
         return RiskAssessmentReport(
             database_alias=plan.database_alias,

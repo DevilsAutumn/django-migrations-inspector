@@ -7,7 +7,7 @@ from typing import TypedDict
 
 from django_migration_inspector.constants import REPORT_SCHEMA_VERSION
 
-from .enums import RiskAnalysisScope, RiskSeverity
+from .enums import RiskAnalysisScope, RiskDecision, RiskFindingKind, RiskSeverity
 from .keys import MigrationNodeKey, MigrationNodeKeyJSON
 from .models import MigrationNode, MigrationNodeJSON
 from .plans import (
@@ -54,6 +54,7 @@ class RiskFindingJSON(TypedDict):
     """Stable JSON shape for risk findings."""
 
     rule_id: str
+    kind: str
     severity: str
     migration: MigrationNodeKeyJSON
     operation_index: int
@@ -70,11 +71,17 @@ class RiskAssessmentReportJSON(TypedDict):
     database_alias: str
     selected_app_label: str | None
     analysis_scope: str
+    decision: str
     affected_app_labels: list[str]
     analyzed_migration_count: int
     analyzed_operation_count: int
     pending_migration_count: int
     pending_operation_count: int
+    risky_migration_count: int
+    risky_app_count: int
+    blocked_migration_count: int
+    destructive_migration_count: int
+    review_migration_count: int
     target_leaf_nodes: list[MigrationNodeKeyJSON]
     overall_severity: str
     rollback_safe: bool
@@ -200,6 +207,7 @@ class RiskFinding:
     """One rule-triggered risk finding."""
 
     rule_id: str
+    kind: RiskFindingKind
     severity: RiskSeverity
     migration: MigrationNodeKey
     operation_index: int
@@ -212,6 +220,7 @@ class RiskFinding:
 
         return {
             "rule_id": self.rule_id,
+            "kind": self.kind.value,
             "severity": self.severity.value,
             "migration": self.migration.to_json_dict(),
             "operation_index": self.operation_index,
@@ -237,6 +246,16 @@ class RiskAssessmentReport:
         """Return which migration slice this report analyzed."""
 
         return self.plan.scope
+
+    @property
+    def decision(self) -> RiskDecision:
+        """Return the top-level user decision for this plan."""
+
+        if self.blocked_migration_count:
+            return RiskDecision.ROLLBACK_BLOCKED
+        if self.findings:
+            return RiskDecision.REVIEW_REQUIRED
+        return RiskDecision.CLEAR
 
     @property
     def analyzed_migration_count(self) -> int:
@@ -272,6 +291,54 @@ class RiskAssessmentReport:
             return self.analyzed_operation_count
         return 0
 
+    @property
+    def risky_migration_count(self) -> int:
+        """Return the number of migrations with at least one finding."""
+
+        return len({finding.migration for finding in self.findings})
+
+    @property
+    def risky_app_count(self) -> int:
+        """Return the number of apps with at least one finding."""
+
+        return len({finding.migration.app_label for finding in self.findings})
+
+    @property
+    def blocked_migration_count(self) -> int:
+        """Return the number of migrations that block a clean rollback path."""
+
+        return len(
+            {
+                finding.migration
+                for finding in self.findings
+                if finding.kind is RiskFindingKind.BLOCKED
+            }
+        )
+
+    @property
+    def destructive_migration_count(self) -> int:
+        """Return the number of migrations with destructive schema operations."""
+
+        return len(
+            {
+                finding.migration
+                for finding in self.findings
+                if finding.kind is RiskFindingKind.DESTRUCTIVE
+            }
+        )
+
+    @property
+    def review_migration_count(self) -> int:
+        """Return the number of migrations that need manual review."""
+
+        return len(
+            {
+                finding.migration
+                for finding in self.findings
+                if finding.kind is RiskFindingKind.REVIEW
+            }
+        )
+
     def to_json_dict(self) -> RiskAssessmentReportJSON:
         """Serialize the report into the stable JSON contract."""
 
@@ -281,11 +348,17 @@ class RiskAssessmentReport:
             "database_alias": self.database_alias,
             "selected_app_label": self.selected_app_label,
             "analysis_scope": self.analysis_scope.value,
+            "decision": self.decision.value,
             "affected_app_labels": list(self.affected_app_labels),
             "analyzed_migration_count": self.analyzed_migration_count,
             "analyzed_operation_count": self.analyzed_operation_count,
             "pending_migration_count": self.pending_migration_count,
             "pending_operation_count": self.pending_operation_count,
+            "risky_migration_count": self.risky_migration_count,
+            "risky_app_count": self.risky_app_count,
+            "blocked_migration_count": self.blocked_migration_count,
+            "destructive_migration_count": self.destructive_migration_count,
+            "review_migration_count": self.review_migration_count,
             "target_leaf_nodes": [
                 target_leaf_node.to_json_dict() for target_leaf_node in self.plan.target_leaf_nodes
             ],

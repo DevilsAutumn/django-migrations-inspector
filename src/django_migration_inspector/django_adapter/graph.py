@@ -9,6 +9,7 @@ from pathlib import Path
 from django.db.migrations.graph import Node
 from django.db.migrations.loader import MigrationLoader
 
+from django_migration_inspector.django_adapter.app_ignore import build_ignored_app_labels
 from django_migration_inspector.django_adapter.compat import validate_supported_django_version
 from django_migration_inspector.django_adapter.loader import load_migration_loader
 from django_migration_inspector.django_adapter.operations import build_operation_descriptor
@@ -28,20 +29,34 @@ def _resolve_module_path(module_name: str) -> Path | None:
     return Path(module_file).resolve()
 
 
-def _sorted_node_keys(raw_nodes: set[Node]) -> tuple[MigrationNodeKey, ...]:
+def _sorted_node_keys(
+    raw_nodes: set[Node],
+    *,
+    ignored_app_labels: frozenset[str],
+) -> tuple[MigrationNodeKey, ...]:
     return tuple(
         sorted(
-            (MigrationNodeKey.from_tuple(node.key) for node in raw_nodes),
+            (
+                MigrationNodeKey.from_tuple(node.key)
+                for node in raw_nodes
+                if node.key[0] not in ignored_app_labels
+            ),
             key=_key_sort_key,
         )
     )
 
 
-def build_graph_snapshot(loader: MigrationLoader) -> MigrationGraphSnapshot:
+def build_graph_snapshot(
+    loader: MigrationLoader,
+    *,
+    ignored_app_labels: frozenset[str],
+) -> MigrationGraphSnapshot:
     """Normalize the loaded Django migration graph into immutable domain objects."""
 
     migration_nodes: list[MigrationNode] = []
     for raw_key in sorted(loader.disk_migrations, key=lambda item: (item[0], item[1])):
+        if raw_key[0] in ignored_app_labels:
+            continue
         migration = loader.disk_migrations[raw_key]
         graph_node = loader.graph.node_map[raw_key]
         migration_key = MigrationNodeKey.from_tuple(raw_key)
@@ -52,13 +67,20 @@ def build_graph_snapshot(loader: MigrationLoader) -> MigrationGraphSnapshot:
         migration_nodes.append(
             MigrationNode(
                 key=migration_key,
-                dependencies=_sorted_node_keys(graph_node.parents),
-                dependents=_sorted_node_keys(graph_node.children),
+                dependencies=_sorted_node_keys(
+                    graph_node.parents,
+                    ignored_app_labels=ignored_app_labels,
+                ),
+                dependents=_sorted_node_keys(
+                    graph_node.children,
+                    ignored_app_labels=ignored_app_labels,
+                ),
                 replaces=tuple(
                     sorted(
                         (
                             MigrationNodeKey.from_tuple(replacement)
                             for replacement in (migration.replaces or [])
+                            if replacement[0] not in ignored_app_labels
                         ),
                         key=_key_sort_key,
                     )
@@ -95,4 +117,7 @@ class DjangoMigrationGraphProvider:
 
         validate_supported_django_version()
         loader = load_migration_loader(database_alias=database_alias)
-        return build_graph_snapshot(loader=loader)
+        return build_graph_snapshot(
+            loader=loader,
+            ignored_app_labels=build_ignored_app_labels(),
+        )

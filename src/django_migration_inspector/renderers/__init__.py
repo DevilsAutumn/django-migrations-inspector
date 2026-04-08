@@ -9,14 +9,16 @@ from .dot import DotGraphReportRenderer
 from .json import JsonGraphReportRenderer
 from .mermaid import MermaidGraphReportRenderer
 from .risk_json import JsonRiskReportRenderer
-from .risk_text import TextRiskReportRenderer
+from .risk_text import RiskTextRenderOptions, TextRiskReportRenderer
 from .rollback_json import JsonRollbackReportRenderer
 from .rollback_text import RollbackTextRenderOptions, TextRollbackReportRenderer
-from .text import TextGraphReportRenderer
+from .text import GraphTextRenderOptions, TextGraphReportRenderer
 
 __all__ = [
     "GraphReportRenderer",
+    "GraphTextRenderOptions",
     "RiskReportRenderer",
+    "RiskTextRenderOptions",
     "RollbackReportRenderer",
     "RollbackTextRenderOptions",
     "get_graph_report_renderer",
@@ -25,7 +27,11 @@ __all__ = [
 ]
 
 
-def get_graph_report_renderer(output_format: OutputFormat) -> GraphReportRenderer:
+def get_graph_report_renderer(
+    output_format: OutputFormat,
+    *,
+    text_options: GraphTextRenderOptions | None = None,
+) -> GraphReportRenderer:
     """Return the renderer for the selected output format."""
 
     if output_format is OutputFormat.JSON:
@@ -34,15 +40,19 @@ def get_graph_report_renderer(output_format: OutputFormat) -> GraphReportRendere
         return MermaidGraphReportRenderer()
     if output_format is OutputFormat.DOT:
         return DotGraphReportRenderer()
-    return TextGraphReportRenderer()
+    return TextGraphReportRenderer(options=text_options or GraphTextRenderOptions())
 
 
-def get_risk_report_renderer(output_format: OutputFormat) -> RiskReportRenderer:
+def get_risk_report_renderer(
+    output_format: OutputFormat,
+    *,
+    text_options: RiskTextRenderOptions | None = None,
+) -> RiskReportRenderer:
     """Return the renderer for the selected risk output format."""
 
     if output_format is OutputFormat.JSON:
         return JsonRiskReportRenderer()
-    return TextRiskReportRenderer()
+    return TextRiskReportRenderer(options=text_options or RiskTextRenderOptions())
 
 
 def get_rollback_report_renderer(

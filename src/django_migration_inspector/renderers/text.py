@@ -12,6 +12,12 @@ from django_migration_inspector.domain.reports import (
 )
 
 
+def _pluralize(count: int, singular: str, plural: str | None = None) -> str:
+    resolved_plural = plural or f"{singular}s"
+    noun = singular if count == 1 else resolved_plural
+    return f"{count} {noun}"
+
+
 def _format_node_keys(node_keys: tuple[MigrationNodeKey, ...]) -> list[str]:
     if not node_keys:
         return ["  - none"]
@@ -43,35 +49,85 @@ def _format_hotspots(dependency_hotspots: tuple[DependencyHotspot, ...]) -> list
     ]
 
 
+@dataclass(frozen=True, slots=True)
+class GraphTextRenderOptions:
+    """Configuration for graph text rendering."""
+
+    details: bool = False
+
+
 @dataclass(slots=True)
 class TextGraphReportRenderer:
     """Render graph reports for local CLI usage."""
 
+    options: GraphTextRenderOptions = GraphTextRenderOptions()
+
     def render(self, report: GraphInspectionReport) -> str:
         """Render the graph report into plain text."""
 
-        scope = report.selected_app_label or "all apps"
+        title = "Django Migration Inspector Graph Check"
+        decision = "REVIEW GRAPH" if report.multiple_head_apps or report.merge_nodes else "CLEAR"
         lines = [
-            "Django Migration Inspector",
-            "==========================",
-            f"Database alias: {report.database_alias}",
-            f"Scope: {scope}",
-            f"Total apps: {report.total_apps}",
-            f"Total migrations: {report.total_migrations}",
+            title,
+            "=" * len(title),
+            f"Decision: {decision}",
+            (
+                f"Scope: {report.selected_app_label}"
+                if report.selected_app_label is not None
+                else f"Visible apps: {report.total_apps}"
+            ),
+            f"Visible migrations: {report.total_migrations}",
             "",
-            "Root migrations:",
-            *_format_node_keys(report.root_nodes),
-            "",
-            "Leaf migrations:",
-            *_format_node_keys(report.leaf_nodes),
-            "",
-            "Merge migrations:",
-            *_format_node_keys(report.merge_nodes),
-            "",
-            "Apps with multiple heads:",
-            *_format_app_heads(report.multiple_head_apps),
-            "",
-            "Dependency hotspots:",
-            *_format_hotspots(report.dependency_hotspots),
+            "Summary:",
+            (f"  - {_pluralize(len(report.multiple_head_apps), 'app')} have multiple heads."),
+            f"  - {_pluralize(len(report.merge_nodes), 'merge migration')} are present.",
+            "  - "
+            f"{_pluralize(len(report.dependency_hotspots), 'dependency hotspot')} may affect "
+            "planning.",
         ]
+
+        lines.extend(["", "Graph issues:"])
+        if not report.multiple_head_apps and not report.merge_nodes:
+            lines.append("  - No multiple heads or merge migrations found in the visible scope.")
+        else:
+            if report.multiple_head_apps:
+                for app_head_group in report.multiple_head_apps:
+                    head_list = ", ".join(head.identifier for head in app_head_group.heads)
+                    lines.append(
+                        "  - "
+                        f"{app_head_group.app_label} has {len(app_head_group.heads)} heads: "
+                        f"{head_list}"
+                    )
+            if report.merge_nodes:
+                lines.extend([f"  - {merge_node.identifier}" for merge_node in report.merge_nodes])
+
+        lines.extend(["", "Hotspots:"])
+        lines.extend(_format_hotspots(report.dependency_hotspots))
+
+        if self.options.details:
+            lines.extend(
+                [
+                    "",
+                    "Root migrations:",
+                    *_format_node_keys(report.root_nodes),
+                    "",
+                    "Leaf migrations:",
+                    *_format_node_keys(report.leaf_nodes),
+                    "",
+                    "Merge migrations:",
+                    *_format_node_keys(report.merge_nodes),
+                    "",
+                    "Apps with multiple heads:",
+                    *_format_app_heads(report.multiple_head_apps),
+                ]
+            )
+        elif report.root_nodes or report.leaf_nodes:
+            lines.extend(
+                [
+                    "",
+                    "Next step:",
+                    "  - Run `python manage.py migration_inspect --details` for root and leaf "
+                    "migration lists.",
+                ]
+            )
         return "\n".join(lines) + "\n"

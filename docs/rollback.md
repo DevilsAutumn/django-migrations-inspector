@@ -9,39 +9,43 @@ Rollback simulation helps answer a question teams usually face under pressure:
 Simulate rollback to a specific migration:
 
 ```bash
-python manage.py migration_inspect --rollback billing 0001_initial
+python manage.py migration_inspect rollback billing 0001_initial
+python manage.py migration_inspect rollback billing 0001
 ```
+
+Unique migration prefixes are accepted, so `0001` resolves to `0001_initial` when there is only
+one matching migration in that app. Ambiguous prefixes still fail with an error.
 
 Simulate unapplying an app back to zero:
 
 ```bash
-python manage.py migration_inspect --rollback billing zero
+python manage.py migration_inspect rollback billing zero
 ```
 
 JSON output is also supported:
 
 ```bash
-python manage.py migration_inspect --rollback billing 0001_initial --format json
+python manage.py migration_inspect rollback billing 0001_initial --json
 ```
 
 For larger projects, the text output is summary-first by default:
 
 ```bash
-python manage.py migration_inspect --rollback users zero
-python manage.py migration_inspect --rollback users zero --verbose
-python manage.py migration_inspect --rollback users zero --show-operations
-python manage.py migration_inspect --rollback users zero --why-app trips
-python manage.py migration_inspect --rollback users zero --output users-rollback.txt
+python manage.py migration_inspect rollback users zero
+python manage.py migration_inspect rollback users zero --details
+python manage.py migration_inspect rollback users zero --show-operations
+python manage.py migration_inspect rollback users zero --why-app trips
+python manage.py migration_inspect rollback users zero --output users-rollback.txt
 ```
 
 ## What the report includes
 
 The simulator currently reports:
 
-1. Reverse migration order.
-2. Whether rollback is possible.
-3. Whether rollback is operationally safe.
-4. Irreversible blockers.
+1. Whether rollback is blocked, high risk, or clear.
+2. The rollback blast radius across steps and apps.
+3. Irreversible blockers.
+4. Data-loss reversals such as restoring dropped fields or deleted tables without restoring data.
 5. Cross-app impact caused by dependencies.
 6. Merge-migration warnings.
 7. App-level impact summaries.
@@ -51,13 +55,13 @@ The simulator currently reports:
 
 The default text output is designed for large rollback plans:
 
-1. Header summary with blocker and concern counts
-2. Critical blockers
+1. Decision and blast radius
+2. Summary of blockers, data-loss reversals, and dependency reach
 3. Why other apps are included
 4. App impact summary
 5. Top risky migrations
 
-Use `--verbose` to include the full step list and concern list.
+Use `--details` to include the full step list and concern list.
 Use `--show-operations` to include reverse operations under each step.
 Use `--why-app APP_LABEL` to focus on one dependency chain.
 

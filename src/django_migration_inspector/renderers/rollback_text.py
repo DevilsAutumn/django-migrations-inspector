@@ -34,7 +34,7 @@ def _pluralize(count: int, singular: str, plural: str | None = None) -> str:
 class RollbackTextRenderOptions:
     """Configuration for rollback text rendering."""
 
-    verbose: bool = False
+    details: bool = False
     show_operations: bool = False
     why_app: str | None = None
     max_summary_blockers: int = 5
@@ -70,56 +70,82 @@ class TextRollbackReportRenderer:
     def render(self, report: RollbackSimulationReport) -> str:
         """Render the rollback report into plain text."""
 
+        title = "Django Migration Inspector Rollback Check"
         lines = [
-            "Django Migration Inspector Rollback Simulation",
-            "==============================================",
-            f"Database alias: {report.database_alias}",
+            title,
+            "=" * len(title),
+            f"Decision: {self._format_decision(report)}",
             f"Target: {report.plan.target_identifier}",
-            f"Planned rollback steps: {report.step_count}",
-            (
-                "Affected apps: "
-                + (
-                    ", ".join(report.plan.affected_app_labels)
-                    if report.plan.affected_app_labels
-                    else "none"
-                )
-            ),
-            f"Overall severity: {report.overall_severity.value.upper()}",
-            f"Rollback possible: {'YES' if report.rollback_possible else 'NO'}",
-            f"Rollback safe: {'YES' if report.rollback_safe else 'NO'}",
-            f"Blocker count: {len(report.blockers)}",
-            f"Concern count: {len(report.concerns)}",
+            "Blast radius: "
+            f"{_pluralize(report.step_count, 'step')} in "
+            f"{_pluralize(len(report.plan.affected_app_labels), 'app')}",
         ]
 
-        if not self.options.verbose:
-            lines.extend(
-                [
-                    "",
-                    "Detail modes:",
-                    "  - Use --verbose to show step-by-step rollback coverage and all concerns.",
-                    "  - Use --show-operations to include reverse operations for each step.",
-                    "  - Use --why-app APP_LABEL to explain one cross-app dependency chain.",
-                ]
-            )
+        if report.database_alias != "default":
+            lines.append(f"Database alias: {report.database_alias}")
 
+        lines.extend(self._render_summary(report))
         lines.extend(self._render_blocker_summary(report))
         lines.extend(self._render_inclusion_reasons(report))
         lines.extend(self._render_app_impact_summary(report))
         lines.extend(self._render_risky_migration_summary(report))
 
-        if self.options.verbose:
+        if self.options.details:
             lines.extend(self._render_step_details(report))
             lines.extend(self._render_full_concerns(report))
         else:
-            lines.extend(
-                [
-                    "",
-                    "Detailed rollback steps:",
-                    "  - hidden in summary mode",
-                ]
-            )
+            lines.extend(self._render_next_step(report))
 
         return "\n".join(lines) + "\n"
+
+    def _format_decision(self, report: RollbackSimulationReport) -> str:
+        if not report.rollback_possible:
+            return "BLOCKED"
+        if not report.rollback_safe:
+            return "HIGH RISK"
+        if report.concerns:
+            return "REVIEW REQUIRED"
+        return "CLEAR"
+
+    def _render_summary(self, report: RollbackSimulationReport) -> list[str]:
+        lines = ["", "Summary:"]
+        if report.blockers:
+            blocker_migration_count = len({blocker.migration for blocker in report.blockers})
+            lines.append(
+                "  - "
+                f"{_pluralize(blocker_migration_count, 'migration')} "
+                "block a clean rollback path."
+            )
+
+        schema_restore_migrations = {
+            concern.migration
+            for concern in report.concerns
+            if concern.category in {"data_loss_reversal", "table_restore"}
+        }
+        if schema_restore_migrations:
+            lines.append(
+                "  - "
+                f"{_pluralize(len(schema_restore_migrations), 'migration')} restore schema shape "
+                "without restoring deleted data."
+            )
+
+        external_app_count = len(
+            [
+                app_label
+                for app_label in report.plan.affected_app_labels
+                if app_label != report.plan.target_app_label
+            ]
+        )
+        if external_app_count:
+            lines.append(
+                "  - "
+                f"Rollback reaches {_pluralize(external_app_count, 'additional app')} through "
+                "dependencies."
+            )
+
+        if not report.blockers and not report.concerns:
+            lines.append("  - No rollback blockers or major concerns detected in this path.")
+        return lines
 
     def _render_blocker_summary(self, report: RollbackSimulationReport) -> list[str]:
         lines = ["", "Critical blockers:"]
@@ -136,7 +162,7 @@ class TextRollbackReportRenderer:
             lines.append(
                 "  - "
                 f"{_pluralize(remaining_blockers, 'additional blocker')} hidden. "
-                "Use --verbose for the full blocker list."
+                "Use --details for the full blocker list."
             )
         return lines
 
@@ -407,7 +433,7 @@ class TextRollbackReportRenderer:
             lines.append(
                 "  - "
                 f"{_pluralize(remaining_summaries, 'additional risky migration')} hidden. "
-                "Use --verbose for the full concern list."
+                "Use --details for the full concern list."
             )
         return lines
 
@@ -512,5 +538,29 @@ class TextRollbackReportRenderer:
                     f"    {concern.message}",
                     f"    Recommendation: {concern.recommendation}",
                 ]
+            )
+        return lines
+
+    def _render_next_step(self, report: RollbackSimulationReport) -> list[str]:
+        target_app_label = report.plan.target_app_label
+        target_migration_name = report.plan.target_migration_name or "zero"
+        lines = ["", "Next step:"]
+        lines.append(
+            "  - Run "
+            f"`python manage.py migration_inspect rollback {target_app_label} "
+            f"{target_migration_name} --details` for the full rollback step list."
+        )
+        lines.append(
+            "  - Run "
+            f"`python manage.py migration_inspect rollback {target_app_label} "
+            f"{target_migration_name} --show-operations` to inspect reverse operations for each "
+            "step."
+        )
+        if any(app != report.plan.target_app_label for app in report.plan.affected_app_labels):
+            lines.append(
+                "  - Run "
+                f"`python manage.py migration_inspect rollback {target_app_label} "
+                f"{target_migration_name} --why-app APP_LABEL` to explain one cross-app "
+                "dependency chain."
             )
         return lines

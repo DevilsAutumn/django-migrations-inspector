@@ -4,15 +4,33 @@
 
 Inspect the Django migration graph and emit a stable report.
 
+The command is designed around four different questions:
+
+1. `inspect`: Is the graph easy to reason about?
+2. `risk`: Are pending migrations safe to deploy?
+3. `audit`: Which migrations on disk need human review?
+4. `rollback`: If I reverse, what blocks me and what else breaks?
+
+By default, `inspect`, `risk`, and `audit` ignore Django built-in apps and third-party apps.
+Those modes focus on project apps detected from the Django project roots instead of everything in
+`site-packages`.
+
 ### Basic usage
 
 ```bash
 python manage.py migration_inspect
-python manage.py migration_inspect --risk
-python manage.py migration_inspect --risk-history
-python manage.py migration_inspect --rollback billing 0001_initial
-python manage.py migration_inspect --rollback users zero --why-app trips
+python manage.py migration_inspect risk
+python manage.py migration_inspect audit
+python manage.py migration_inspect rollback billing 0001_initial
+python manage.py migration_inspect rollback users zero --why-app trips
 ```
+
+The command now supports a simpler subcommand style:
+
+1. `inspect`
+2. `risk`
+3. `audit`
+4. `rollback`
 
 ### Options
 
@@ -61,71 +79,82 @@ python manage.py migration_inspect --database default
 Write the rendered report to a file instead of stdout:
 
 ```bash
-python manage.py migration_inspect --rollback users zero --output rollback-summary.txt
-python manage.py migration_inspect --rollback users zero --format json --output rollback.json
+python manage.py migration_inspect rollback users zero --output rollback-summary.txt
+python manage.py migration_inspect rollback users zero --json --output rollback.json
 ```
 
-#### `--pager`
-
-Choose whether long text output should open in a pager:
-
-```bash
-python manage.py migration_inspect --rollback users zero --pager auto
-python manage.py migration_inspect --rollback users zero --pager on
-python manage.py migration_inspect --rollback users zero --pager off
-```
-
-#### `--risk`
+#### `risk`
 
 Analyze the pending forward migration plan rather than rendering the graph summary:
 
 ```bash
-python manage.py migration_inspect --risk
-python manage.py migration_inspect --risk --format json
-python manage.py migration_inspect --risk --app billing
+python manage.py migration_inspect risk
+python manage.py migration_inspect risk --json
+python manage.py migration_inspect risk --app billing
 ```
 
-`--risk` currently supports:
+`risk` currently supports:
 
 1. `text`
 2. `json`
 
 It does not currently support `mermaid` or `dot`.
 
-When there are no pending migrations, `--risk` now prints a note explaining that it only checked unapplied forward steps.
-Use `--risk-history` to audit the migrations already present on disk.
+The default text output is summary-first:
 
-#### `--risk-history`
+1. Decision: `CLEAR`, `REVIEW REQUIRED`, or `ROLLBACK BLOCKED`
+2. Counts for rollback blockers, destructive migrations, and review-needed migrations
+3. Apps needing attention
+4. Top migrations to look at first
+
+Use `--details` for the full per-operation review list.
+
+When there are no pending migrations, `risk` prints a note explaining that it only checked unapplied forward steps.
+Use `audit` to inspect the migrations already present on disk.
+
+#### `audit`
 
 Audit all visible migrations on disk rather than only the pending forward plan:
 
 ```bash
-python manage.py migration_inspect --risk-history
-python manage.py migration_inspect --risk-history --format json
-python manage.py migration_inspect --risk-history --app billing
+python manage.py migration_inspect audit
+python manage.py migration_inspect audit --json
+python manage.py migration_inspect audit --app billing
 ```
 
-`--risk-history` currently supports:
+`audit` currently supports:
 
 1. `text`
 2. `json`
 
 It does not currently support `mermaid` or `dot`.
 
-#### `--rollback APP_LABEL MIGRATION_NAME`
+The default text output is summary-first:
+
+1. Decision for the visible migration history
+2. Risky migration count by app
+3. Top historical migrations that deserve review
+
+Use `--details` for the full finding list.
+
+#### `rollback APP_LABEL MIGRATION_NAME`
 
 Simulate rollback to a requested migration target:
 
 ```bash
-python manage.py migration_inspect --rollback billing 0001_initial
-python manage.py migration_inspect --rollback billing zero
-python manage.py migration_inspect --rollback billing 0001_initial --format json
-python manage.py migration_inspect --rollback users zero --verbose
-python manage.py migration_inspect --rollback users zero --show-operations
-python manage.py migration_inspect --rollback users zero --why-app trips
+python manage.py migration_inspect rollback billing 0001_initial
+python manage.py migration_inspect rollback billing 0001
+python manage.py migration_inspect rollback billing zero
+python manage.py migration_inspect rollback billing 0001_initial --json
+python manage.py migration_inspect rollback users zero --details
+python manage.py migration_inspect rollback users zero --show-operations
+python manage.py migration_inspect rollback users zero --why-app trips
 ```
 
-`--rollback` currently supports:
+Rollback targets accept unique prefixes within the selected app, so `0001` can resolve to
+`0001_initial`. Ambiguous prefixes are rejected with a clear error message.
+
+`rollback` currently supports:
 
 1. `text`
 2. `json`
@@ -135,21 +164,24 @@ It does not currently support `mermaid` or `dot`.
 Text rollback output is summary-first by default, so large rollback plans do not flood the terminal.
 Use the following flags to expand detail only when you need it:
 
-#### `--verbose`
+#### `--details`
 
-For text rollback output, include the per-step rollback list and the full concern list:
+For text output, include the full detailed listing for the selected mode:
 
 ```bash
-python manage.py migration_inspect --rollback users zero --verbose
+python manage.py migration_inspect --details
+python manage.py migration_inspect risk --details
+python manage.py migration_inspect audit --details
+python manage.py migration_inspect rollback users zero --details
 ```
 
 #### `--show-operations`
 
 For text rollback output, include reverse operations for each rollback step.
-This implies the same detailed mode as `--verbose`:
+This implies the same detailed mode as `--details`:
 
 ```bash
-python manage.py migration_inspect --rollback users zero --show-operations
+python manage.py migration_inspect rollback users zero --show-operations
 ```
 
 #### `--why-app APP_LABEL`
@@ -157,7 +189,7 @@ python manage.py migration_inspect --rollback users zero --show-operations
 For text rollback output, explain why one cross-app dependency chain is part of the rollback plan:
 
 ```bash
-python manage.py migration_inspect --rollback users zero --why-app trips
+python manage.py migration_inspect rollback users zero --why-app trips
 ```
 
 ## Output expectations

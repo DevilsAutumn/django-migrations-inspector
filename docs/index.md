@@ -12,11 +12,20 @@ It helps answer the questions that usually show up too late:
 The current implementation already provides:
 
 1. Typed migration graph loading.
-2. Graph intelligence reports for roots, leaves, merges, and conflict heads.
-3. Initial rule-driven risk analysis for destructive and irreversible migration plans.
-4. Rollback simulation with blockers, cross-app impact, and reverse-step previews.
+2. Graph checks focused on multiple heads, merge nodes, and dependency hotspots.
+3. Risk analysis that separates rollback blockers, destructive changes, and review-needed migrations.
+4. Rollback simulation with blockers, blast radius, cross-app impact, and reverse-step previews.
 5. Local-first visual outputs in text, JSON, Mermaid, and Graphviz DOT.
 6. A reusable Django management command that works in local development and CI.
+
+## Command mindset
+
+Each command is meant to answer one concrete Django workflow question:
+
+1. `migration_inspect`: Is the graph clean enough to reason about?
+2. `migration_inspect risk`: Can I deploy the pending migrations safely?
+3. `migration_inspect audit`: Which historical migrations need human review?
+4. `migration_inspect rollback APP TARGET`: Can I reverse this change path safely?
 
 ## Why this toolkit exists
 

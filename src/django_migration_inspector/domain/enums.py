@@ -24,6 +24,22 @@ class RiskSeverity(str, Enum):
     CRITICAL = "critical"
 
 
+class RiskFindingKind(str, Enum):
+    """User-facing classes of migration findings."""
+
+    BLOCKED = "blocked"
+    DESTRUCTIVE = "destructive"
+    REVIEW = "review"
+
+
+class RiskDecision(str, Enum):
+    """High-level decision states for forward migration review."""
+
+    CLEAR = "clear"
+    REVIEW_REQUIRED = "review_required"
+    ROLLBACK_BLOCKED = "rollback_blocked"
+
+
 class RiskAnalysisScope(str, Enum):
     """Supported scopes for risk analysis."""
 

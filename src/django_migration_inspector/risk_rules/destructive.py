@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django_migration_inspector.domain.enums import RiskSeverity
+from django_migration_inspector.domain.enums import RiskFindingKind, RiskSeverity
 from django_migration_inspector.domain.plans import PlannedMigrationStep
 from django_migration_inspector.domain.reports import RiskFinding
 
@@ -22,6 +22,7 @@ class DestructiveSchemaRule:
                 findings.append(
                     RiskFinding(
                         rule_id=self.rule_id,
+                        kind=RiskFindingKind.DESTRUCTIVE,
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
@@ -37,6 +38,7 @@ class DestructiveSchemaRule:
                 findings.append(
                     RiskFinding(
                         rule_id=self.rule_id,
+                        kind=RiskFindingKind.DESTRUCTIVE,
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
