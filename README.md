@@ -1,4 +1,4 @@
-# Django Migration Inspector
+# Django Migration Inspector (Experimental)
 
 `django-migration-inspector` is an open source migration safety toolkit for Django.
 
@@ -8,6 +8,13 @@ It is designed around four practical Django questions:
 2. `migration_inspect risk`: Are the pending migrations safe to deploy?
 3. `migration_inspect audit`: Which migration files in this repo deserve attention?
 4. `migration_inspect rollback APP TARGET`: If we need to reverse, what blocks us and what else gets touched?
+
+How the commands work:
+
+1. `migration_inspect` loads Django's real migration graph for the selected database and reports graph shape: heads, merge migrations, roots, leaves, and dependency hotspots. It does not run migrations.
+2. `migration_inspect risk` asks Django for the pending forward migration plan, then checks those operations with safety rules for destructive schema changes, irreversible data code, raw SQL, and unknown operations.
+3. `migration_inspect audit` uses the same safety rules as `risk`, but scans the migration history instead of only pending migrations. This is useful when an existing project already has many migration files.
+4. `migration_inspect rollback APP TARGET` asks Django for the reverse plan to reach `TARGET`. `TARGET` can be a full migration name, a unique prefix like `0008`, or `zero`. It checks reversibility and shows any cross-app impact from migration dependencies, but it does not apply the rollback.
 
 By default, `inspect`, `risk`, and `audit` ignore Django built-in apps and third-party apps.
 Those reports focus on project apps that live inside your Django project tree rather than
