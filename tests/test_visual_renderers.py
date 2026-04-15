@@ -20,6 +20,10 @@ def test_management_command_renders_mermaid(django_db_blocker: DjangoDbBlocker) 
     assert 'node_inventory_0001_initial["inventory.0001_initial"]' in rendered
     assert "node_inventory_0001_initial --> node_inventory_0002_add_sku" in rendered
     assert "classDef merge" in rendered
+    assert (
+        "class node_analytics_0002_add_payload,node_analytics_0002_add_source conflict;" in rendered
+    )
+    assert ", node_" not in rendered
 
 
 def test_management_command_renders_dot(django_db_blocker: DjangoDbBlocker) -> None:

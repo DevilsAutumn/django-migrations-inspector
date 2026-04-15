@@ -79,7 +79,7 @@ class MermaidGraphReportRenderer:
         if not migration_keys:
             return None
 
-        node_ids = ", ".join(
+        node_ids = ",".join(
             build_mermaid_node_id(migration_key) for migration_key in migration_keys
         )
         return f"    class {node_ids} {class_name};"
