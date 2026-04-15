@@ -23,13 +23,14 @@ everything installed in the environment.
 `rollback` stays dependency-accurate instead of hiding external apps, because rollback safety can
 depend on them.
 
-The first implementation slice in this repository focuses on:
+The current implementation focuses on:
 
 1. Loading Django migration graphs into a typed internal model.
 2. Detecting merge nodes, multiple heads, root and leaf migrations, and dependency hotspots.
-3. Analyzing both pending deploy plans and historical migration files with initial rule-driven risk scoring.
-4. Rendering deterministic text, JSON, Mermaid, and Graphviz DOT reports.
-5. Exposing a reusable `migration_inspect` Django management command.
+3. Analyzing both pending deploy plans and historical migration files with rule-driven risk scoring.
+4. Simulating rollback plans with blockers, blast radius, cross-app impact, and reverse-step previews.
+5. Rendering deterministic text, JSON, Mermaid, and Graphviz DOT reports.
+6. Exposing a reusable `migration_inspect` Django management command.
 
 Example usage:
 
@@ -41,14 +42,16 @@ python manage.py migration_inspect risk --details
 python manage.py migration_inspect audit
 python manage.py migration_inspect audit --details
 python manage.py migration_inspect rollback billing 0001_initial
-python manage.py migration_inspect rollback users zero
-python manage.py migration_inspect rollback users zero --details
-python manage.py migration_inspect rollback users zero --why-app trips
+python manage.py migration_inspect rollback inventory zero
+python manage.py migration_inspect rollback inventory zero --details
+python manage.py migration_inspect rollback inventory 0001_initial --why-app catalog
 python manage.py migration_inspect --json
 python manage.py migration_inspect --format mermaid
 python manage.py migration_inspect --format dot
 python manage.py migration_inspect --app analytics
 ```
+
+Replace `billing`, `inventory`, `catalog`, and `analytics` with app labels from your own Django project.
 
 To expose the management command, add `"django_migration_inspector"` to `INSTALLED_APPS`.
 
@@ -66,6 +69,7 @@ mkdocs build --strict
 Local quality commands:
 
 ```bash
+python -m pip install -e '.[dev,docs]'
 ruff format .
 ruff format --check .
 ruff check .
