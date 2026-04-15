@@ -32,9 +32,7 @@ SIMPLE_MODES = ("inspect", "risk", "audit", "rollback")
 class Command(BaseCommand):
     """Inspect the Django migration graph and emit a stable report."""
 
-    help = (
-        "Inspect Django migrations with graph, deploy-risk, audit, and rollback modes."
-    )
+    help = "Inspect Django migrations with graph, deploy-risk, audit, and rollback modes."
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(

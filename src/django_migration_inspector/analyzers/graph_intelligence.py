@@ -19,6 +19,7 @@ from django_migration_inspector.exceptions import MigrationInspectionError
 def _key_sort_key(migration_key: MigrationNodeKey) -> tuple[str, str]:
     return (migration_key.app_label, migration_key.migration_name)
 
+
 @dataclass(slots=True)
 class GraphIntelligenceAnalyzer:
     """Analyze normalized migration graphs into stable reports."""
