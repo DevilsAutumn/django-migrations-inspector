@@ -30,6 +30,18 @@ def _pluralize(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {noun}"
 
 
+def _format_operation_reference(
+    *,
+    operation_index: int | None,
+    operation_path: str | None,
+) -> str | None:
+    if operation_index is None or operation_path is None:
+        return None
+    if operation_path == str(operation_index):
+        return f"op #{operation_index}"
+    return f"op {operation_path}"
+
+
 @dataclass(frozen=True, slots=True)
 class RollbackTextRenderOptions:
     """Configuration for rollback text rendering."""
@@ -184,11 +196,15 @@ class TextRollbackReportRenderer:
         return lines
 
     def _render_blocker_entry(self, blocker: RollbackBlocker) -> list[str]:
+        operation_reference = _format_operation_reference(
+            operation_index=blocker.operation_index,
+            operation_path=blocker.operation_path,
+        )
         return [
             (
                 "  - "
                 f"{blocker.migration.identifier} "
-                f"(op #{blocker.operation_index}: {blocker.operation_name})"
+                f"({operation_reference}: {blocker.operation_name})"
             ),
             f"    {blocker.message}",
             f"    Recommendation: {blocker.recommendation}",
@@ -526,10 +542,15 @@ class TextRollbackReportRenderer:
             if not step.reverse_operations:
                 lines.append("    - no operations")
                 continue
-            for operation in step.reverse_operations:
+            for operation in step.iter_reverse_operations():
                 marker = "BLOCKER" if not operation.is_reversible else "op"
+                operation_reference = _format_operation_reference(
+                    operation_index=operation.index,
+                    operation_path=operation.path,
+                )
                 lines.append(
-                    f"    - [{marker}] #{operation.index} {operation.name}: {operation.description}"
+                    f"    - [{marker}] {operation_reference} "
+                    f"{operation.name}: {operation.description}"
                 )
         return lines
 
@@ -540,9 +561,13 @@ class TextRollbackReportRenderer:
             return lines
 
         for concern in report.concerns:
+            operation_reference = _format_operation_reference(
+                operation_index=concern.operation_index,
+                operation_path=concern.operation_path,
+            )
             operation_label = (
-                f" (op #{concern.operation_index}: {concern.operation_name})"
-                if concern.operation_index is not None and concern.operation_name is not None
+                f" ({operation_reference}: {concern.operation_name})"
+                if operation_reference is not None and concern.operation_name is not None
                 else ""
             )
             lines.extend(

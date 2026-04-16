@@ -8,10 +8,13 @@ from django.db import migrations, models
 from django.db.migrations.migration import Migration
 from django.db.migrations.operations.base import Operation
 
+from django_migration_inspector.analyzers import RollbackSimulator
 from django_migration_inspector.django_adapter.operations import (
     build_rollback_operation_descriptor,
 )
 from django_migration_inspector.django_adapter.rollback import _is_merge_migration
+from django_migration_inspector.domain.keys import MigrationNodeKey
+from django_migration_inspector.domain.plans import RollbackMigrationPlan, RollbackMigrationStep
 
 
 def test_build_rollback_operation_descriptor_describes_reverse_add_field() -> None:
@@ -41,6 +44,40 @@ def test_build_rollback_operation_descriptor_describes_reverse_create_model() ->
     assert descriptor.name == "DeleteModel"
     assert descriptor.source_name == "CreateModel"
     assert descriptor.description == "Delete model Widget"
+
+
+def test_rollback_simulator_inspects_separate_database_and_state_nested_operations() -> None:
+    migration_key = MigrationNodeKey("inventory", "0004_manual_split")
+    operation = migrations.SeparateDatabaseAndState(
+        database_operations=[
+            migrations.RunSQL("DROP TABLE legacy_inventory"),
+        ],
+        state_operations=[],
+    )
+    descriptor = build_rollback_operation_descriptor(operation=operation, index=0)
+    step = RollbackMigrationStep(
+        key=migration_key,
+        module="inventory.migrations.0004_manual_split",
+        file_path=None,
+        dependencies=(),
+        is_merge=False,
+        reverse_operations=(descriptor,),
+    )
+    plan = RollbackMigrationPlan(
+        database_alias="default",
+        target_app_label="inventory",
+        target_migration_name="0003_previous",
+        steps=(step,),
+    )
+
+    report = RollbackSimulator().analyze(plan)
+
+    assert descriptor.operation_count == 2
+    assert descriptor.nested_operations[0].path == "0.database_operations[0]"
+    assert report.rollback_possible is False
+    assert report.rollback_safe is False
+    assert report.blockers[0].operation_path == "0.database_operations[0]"
+    assert report.blockers[0].operation_name == "RunSQL"
 
 
 def test_is_merge_migration_requires_multiple_same_app_parents() -> None:

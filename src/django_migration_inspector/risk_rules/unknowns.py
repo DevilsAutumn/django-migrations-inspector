@@ -21,7 +21,7 @@ class UnknownOperationRule:
 
     def evaluate(self, step: PlannedMigrationStep) -> tuple[RiskFinding, ...]:
         findings: list[RiskFinding] = []
-        for operation in step.operations:
+        for operation in step.iter_operations():
             if operation.category is not OperationCategory.UNKNOWN:
                 continue
 
@@ -32,6 +32,7 @@ class UnknownOperationRule:
                     severity=RiskSeverity.MEDIUM,
                     migration=step.key,
                     operation_index=operation.index,
+                    operation_path=operation.path,
                     operation_name=operation.name,
                     message=(
                         "This operation is not yet classified by the toolkit and needs manual "

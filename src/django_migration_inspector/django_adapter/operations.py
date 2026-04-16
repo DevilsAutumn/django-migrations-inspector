@@ -34,6 +34,10 @@ _SCHEMA_OPERATION_NAMES = frozenset(
 _DATA_OPERATION_NAMES = frozenset({"RunPython"})
 _RAW_SQL_OPERATION_NAMES = frozenset({"RunSQL"})
 _STATE_OPERATION_NAMES = frozenset({"SeparateDatabaseAndState"})
+_NESTED_OPERATION_GROUPS = (
+    ("database_operations", "database"),
+    ("state_operations", "state"),
+)
 
 
 def classify_operation(operation: Operation) -> OperationCategory:
@@ -51,33 +55,52 @@ def classify_operation(operation: Operation) -> OperationCategory:
     return OperationCategory.UNKNOWN
 
 
-def build_operation_descriptor(operation: Operation, index: int) -> OperationDescriptor:
+def build_operation_descriptor(
+    operation: Operation,
+    index: int,
+    *,
+    path: str | None = None,
+    context: str = "operation",
+) -> OperationDescriptor:
     """Convert a Django operation object into a typed domain descriptor."""
 
     operation_type = type(operation)
     import_path = f"{operation_type.__module__}.{operation_type.__qualname__}"
+    operation_path = str(index) if path is None else path
     return OperationDescriptor(
         index=index,
+        path=operation_path,
+        context=context,
         name=operation_type.__name__,
         import_path=import_path,
         category=classify_operation(operation),
         description=operation.describe(),
         is_reversible=bool(operation.reversible),
         is_elidable=bool(operation.elidable),
+        nested_operations=_build_nested_operation_descriptors(
+            operation=operation,
+            parent_path=operation_path,
+        ),
     )
 
 
 def build_rollback_operation_descriptor(
     operation: Operation,
     index: int,
+    *,
+    path: str | None = None,
+    context: str = "operation",
 ) -> RollbackOperationDescriptor:
     """Convert a Django operation into a reverse-step descriptor."""
 
     operation_type = type(operation)
     import_path = f"{operation_type.__module__}.{operation_type.__qualname__}"
+    operation_path = str(index) if path is None else path
     reverse_name, reverse_description = describe_reverse_operation(operation)
     return RollbackOperationDescriptor(
         index=index,
+        path=operation_path,
+        context=context,
         name=reverse_name,
         source_name=operation_type.__name__,
         import_path=import_path,
@@ -86,7 +109,51 @@ def build_rollback_operation_descriptor(
         source_description=operation.describe(),
         is_reversible=bool(operation.reversible),
         is_elidable=bool(operation.elidable),
+        nested_operations=_build_nested_rollback_operation_descriptors(
+            operation=operation,
+            parent_path=operation_path,
+        ),
     )
+
+
+def _build_nested_operation_descriptors(
+    *,
+    operation: Operation,
+    parent_path: str,
+) -> tuple[OperationDescriptor, ...]:
+    nested_descriptors: list[OperationDescriptor] = []
+    for attribute_name, context in _NESTED_OPERATION_GROUPS:
+        nested_operations = getattr(operation, attribute_name, ())
+        for index, nested_operation in enumerate(nested_operations):
+            nested_descriptors.append(
+                build_operation_descriptor(
+                    operation=nested_operation,
+                    index=index,
+                    path=f"{parent_path}.{attribute_name}[{index}]",
+                    context=context,
+                )
+            )
+    return tuple(nested_descriptors)
+
+
+def _build_nested_rollback_operation_descriptors(
+    *,
+    operation: Operation,
+    parent_path: str,
+) -> tuple[RollbackOperationDescriptor, ...]:
+    nested_descriptors: list[RollbackOperationDescriptor] = []
+    for attribute_name, context in _NESTED_OPERATION_GROUPS:
+        nested_operations = getattr(operation, attribute_name, ())
+        for index, nested_operation in enumerate(nested_operations):
+            nested_descriptors.append(
+                build_rollback_operation_descriptor(
+                    operation=nested_operation,
+                    index=index,
+                    path=f"{parent_path}.{attribute_name}[{index}]",
+                    context=context,
+                )
+            )
+    return tuple(nested_descriptors)
 
 
 def describe_reverse_operation(operation: Operation) -> tuple[str, str]:

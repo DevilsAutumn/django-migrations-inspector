@@ -17,7 +17,7 @@ class IrreversibleRunPythonRule:
 
     def evaluate(self, step: PlannedMigrationStep) -> tuple[RiskFinding, ...]:
         findings: list[RiskFinding] = []
-        for operation in step.operations:
+        for operation in step.iter_operations():
             if operation.name != "RunPython":
                 continue
 
@@ -51,6 +51,7 @@ class IrreversibleRunPythonRule:
                     severity=severity,
                     migration=step.key,
                     operation_index=operation.index,
+                    operation_path=operation.path,
                     operation_name=operation.name,
                     message=message,
                     recommendation=recommendation,
@@ -67,7 +68,7 @@ class RunSqlRule:
 
     def evaluate(self, step: PlannedMigrationStep) -> tuple[RiskFinding, ...]:
         findings: list[RiskFinding] = []
-        for operation in step.operations:
+        for operation in step.iter_operations():
             if operation.name != "RunSQL":
                 continue
 
@@ -83,6 +84,7 @@ class RunSqlRule:
                     severity=severity,
                     migration=step.key,
                     operation_index=operation.index,
+                    operation_path=operation.path,
                     operation_name=operation.name,
                     message=(
                         "RunSQL bypasses Django's higher-level migration semantics and may have "

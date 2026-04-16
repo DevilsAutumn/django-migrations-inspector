@@ -8,12 +8,20 @@ from typing import NoReturn
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import migrations
 from pytest import MonkeyPatch
 from pytest_django.plugin import DjangoDbBlocker
 
+from django_migration_inspector.analyzers import RiskEngine
 from django_migration_inspector.config import RiskConfig
-from django_migration_inspector.domain.enums import RiskAnalysisScope, RiskSeverity
-from django_migration_inspector.domain.plans import ForwardMigrationPlan
+from django_migration_inspector.django_adapter.operations import build_operation_descriptor
+from django_migration_inspector.domain.enums import (
+    RiskAnalysisScope,
+    RiskFindingKind,
+    RiskSeverity,
+)
+from django_migration_inspector.domain.keys import MigrationNodeKey
+from django_migration_inspector.domain.plans import ForwardMigrationPlan, PlannedMigrationStep
 from django_migration_inspector.domain.reports import RiskAssessmentReport
 from django_migration_inspector.renderers.risk_text import TextRiskReportRenderer
 from django_migration_inspector.services import build_default_risk_service
@@ -205,6 +213,51 @@ def test_management_command_rejects_legacy_risk_flag(
             assert "unrecognized arguments: --risk" in str(error)
         else:
             raise AssertionError("Expected legacy risk flag syntax to fail.")
+
+
+def test_risk_engine_inspects_separate_database_and_state_nested_operations() -> None:
+    migration_key = MigrationNodeKey("inventory", "0004_manual_split")
+    operation = migrations.SeparateDatabaseAndState(
+        database_operations=[
+            migrations.RunSQL("DROP TABLE legacy_inventory"),
+        ],
+        state_operations=[
+            migrations.RemoveField(model_name="widget", name="legacy_code"),
+        ],
+    )
+    descriptor = build_operation_descriptor(operation=operation, index=0)
+    plan = ForwardMigrationPlan(
+        database_alias="default",
+        selected_app_label="inventory",
+        scope=RiskAnalysisScope.PENDING,
+        target_leaf_nodes=(migration_key,),
+        steps=(
+            PlannedMigrationStep(
+                key=migration_key,
+                module="inventory.migrations.0004_manual_split",
+                file_path=None,
+                operations=(descriptor,),
+            ),
+        ),
+    )
+
+    report = RiskEngine().analyze(plan)
+
+    assert descriptor.operation_count == 3
+    assert descriptor.nested_operations[0].path == "0.database_operations[0]"
+    assert descriptor.nested_operations[1].path == "0.state_operations[0]"
+    assert any(
+        finding.operation_name == "RunSQL"
+        and finding.operation_path == "0.database_operations[0]"
+        and finding.kind is RiskFindingKind.BLOCKED
+        for finding in report.findings
+    )
+    assert any(
+        finding.operation_name == "RemoveField"
+        and finding.operation_path == "0.state_operations[0]"
+        and finding.kind is RiskFindingKind.REVIEW
+        for finding in report.findings
+    )
 
 
 def test_text_risk_renderer_explains_empty_pending_plan() -> None:

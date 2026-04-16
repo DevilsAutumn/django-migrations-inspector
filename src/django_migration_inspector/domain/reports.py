@@ -59,6 +59,7 @@ class RiskFindingJSON(TypedDict):
     severity: str
     migration: MigrationNodeKeyJSON
     operation_index: int
+    operation_path: str
     operation_name: str
     message: str
     recommendation: str
@@ -96,6 +97,7 @@ class RollbackBlockerJSON(TypedDict):
 
     migration: MigrationNodeKeyJSON
     operation_index: int
+    operation_path: str
     operation_name: str
     message: str
     recommendation: str
@@ -108,6 +110,7 @@ class RollbackConcernJSON(TypedDict):
     severity: str
     migration: MigrationNodeKeyJSON
     operation_index: int | None
+    operation_path: str | None
     operation_name: str | None
     message: str
     recommendation: str
@@ -215,6 +218,7 @@ class RiskFinding:
     severity: RiskSeverity
     migration: MigrationNodeKey
     operation_index: int
+    operation_path: str
     operation_name: str
     message: str
     recommendation: str
@@ -228,6 +232,7 @@ class RiskFinding:
             "severity": self.severity.value,
             "migration": self.migration.to_json_dict(),
             "operation_index": self.operation_index,
+            "operation_path": self.operation_path,
             "operation_name": self.operation_name,
             "message": self.message,
             "recommendation": self.recommendation,
@@ -381,6 +386,7 @@ class RollbackBlocker:
 
     migration: MigrationNodeKey
     operation_index: int
+    operation_path: str
     operation_name: str
     message: str
     recommendation: str
@@ -391,6 +397,7 @@ class RollbackBlocker:
         return {
             "migration": self.migration.to_json_dict(),
             "operation_index": self.operation_index,
+            "operation_path": self.operation_path,
             "operation_name": self.operation_name,
             "message": self.message,
             "recommendation": self.recommendation,
@@ -405,6 +412,7 @@ class RollbackConcern:
     severity: RiskSeverity
     migration: MigrationNodeKey
     operation_index: int | None
+    operation_path: str | None
     operation_name: str | None
     message: str
     recommendation: str
@@ -417,6 +425,7 @@ class RollbackConcern:
             "severity": self.severity.value,
             "migration": self.migration.to_json_dict(),
             "operation_index": self.operation_index,
+            "operation_path": self.operation_path,
             "operation_name": self.operation_name,
             "message": self.message,
             "recommendation": self.recommendation,

@@ -56,13 +56,14 @@ class RollbackSimulator:
     def _build_blockers(self, plan: RollbackMigrationPlan) -> tuple[RollbackBlocker, ...]:
         blockers: list[RollbackBlocker] = []
         for step in plan.steps:
-            for operation in step.reverse_operations:
+            for operation in step.iter_reverse_operations():
                 if operation.is_reversible:
                     continue
                 blockers.append(
                     RollbackBlocker(
                         migration=step.key,
                         operation_index=operation.index,
+                        operation_path=operation.path,
                         operation_name=operation.source_name,
                         message=(
                             "This reverse step is irreversible, so Django cannot execute a clean "
@@ -94,6 +95,7 @@ class RollbackSimulator:
                         severity=RiskSeverity.MEDIUM,
                         migration=step.key,
                         operation_index=None,
+                        operation_path=None,
                         operation_name=None,
                         message=(
                             "Rolling back this target also affects migrations in another app "
@@ -113,6 +115,7 @@ class RollbackSimulator:
                         severity=RiskSeverity.MEDIUM,
                         migration=step.key,
                         operation_index=None,
+                        operation_path=None,
                         operation_name=None,
                         message=(
                             "This rollback path traverses a merge migration, which can make branch "
@@ -133,7 +136,7 @@ class RollbackSimulator:
         step: RollbackMigrationStep,
     ) -> list[RollbackConcern]:
         concerns: list[RollbackConcern] = []
-        for operation in step.reverse_operations:
+        for operation in step.iter_reverse_operations():
             concern = self._build_operation_concern(step=step, operation=operation)
             if concern is not None:
                 concerns.append(concern)
@@ -151,6 +154,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.HIGH,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.name,
                 message=(
                     "Rollback will remove a field added by this migration. That is expected "
@@ -169,6 +173,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.HIGH,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.name,
                 message=(
                     "Rollback will drop a table created by this migration. That is expected "
@@ -186,6 +191,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.HIGH,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.source_name,
                 message=(
                     "Reversing a field removal restores schema shape but cannot recover the "
@@ -203,6 +209,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.HIGH,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.source_name,
                 message=(
                     "Reversing a model deletion can recreate the table structure but does not "
@@ -220,6 +227,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.MEDIUM,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.source_name,
                 message=(
                     "Rollback includes custom Python data logic, which may still be slow or "
@@ -237,6 +245,7 @@ class RollbackSimulator:
                 severity=RiskSeverity.HIGH,
                 migration=step.key,
                 operation_index=operation.index,
+                operation_path=operation.path,
                 operation_name=operation.source_name,
                 message=(
                     "Rollback includes raw SQL, which may have backend-specific lock or "

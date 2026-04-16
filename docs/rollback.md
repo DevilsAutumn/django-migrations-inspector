@@ -81,6 +81,9 @@ Rollback is marked as not possible when the reverse path includes irreversible o
 2. Irreversible `RunSQL`
 3. Any custom operation marked non-reversible by Django
 
+If these operations are nested inside `SeparateDatabaseAndState`, the simulator still checks them.
+It does not trust the wrapper alone.
+
 ## Current concerns surfaced
 
 The simulator also flags non-blocking but important concerns, including:

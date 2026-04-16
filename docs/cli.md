@@ -125,6 +125,8 @@ python manage.py migration_inspect risk --app billing
 It does not currently support `mermaid` or `dot`.
 
 `risk` cannot run with `--offline` because pending migrations depend on the current database state.
+When a migration uses `SeparateDatabaseAndState`, `risk` also inspects the nested database and state
+operations instead of only checking the wrapper operation.
 
 The default text output is summary-first:
 
@@ -166,6 +168,8 @@ The default text output is summary-first:
 Use `--details` for the full finding list.
 
 Use `audit --offline` when you want a file-only review of a project whose database is not set up.
+Like `risk`, audit also inspects nested `SeparateDatabaseAndState` operations so manual database
+changes do not disappear behind the wrapper operation.
 
 #### `rollback APP_LABEL MIGRATION_NAME`
 

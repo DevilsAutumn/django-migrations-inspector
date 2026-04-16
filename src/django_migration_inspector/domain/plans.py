@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict
@@ -38,6 +39,8 @@ class RollbackOperationDescriptorJSON(TypedDict):
     """Stable JSON shape for reverse operation descriptors."""
 
     index: int
+    path: str
+    context: str
     name: str
     source_name: str
     import_path: str
@@ -46,6 +49,7 @@ class RollbackOperationDescriptorJSON(TypedDict):
     source_description: str
     is_reversible: bool
     is_elidable: bool
+    nested_operations: list[RollbackOperationDescriptorJSON]
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +65,13 @@ class PlannedMigrationStep:
     def operation_count(self) -> int:
         """Return the number of operations in the step."""
 
-        return len(self.operations)
+        return sum(operation.operation_count for operation in self.operations)
+
+    def iter_operations(self) -> Iterator[OperationDescriptor]:
+        """Yield all operations in execution order, including nested operations."""
+
+        for operation in self.operations:
+            yield from operation.iter_self_and_nested()
 
     def to_json_dict(self) -> PlannedMigrationStepJSON:
         """Serialize the step into the stable JSON contract."""
@@ -101,13 +111,19 @@ class RollbackMigrationStep:
     def operation_count(self) -> int:
         """Return the number of reverse operations in the step."""
 
-        return len(self.reverse_operations)
+        return sum(operation.operation_count for operation in self.reverse_operations)
 
     @property
     def has_irreversible_operation(self) -> bool:
         """Return whether the reverse step contains an irreversible operation."""
 
-        return any(not operation.is_reversible for operation in self.reverse_operations)
+        return any(not operation.is_reversible for operation in self.iter_reverse_operations())
+
+    def iter_reverse_operations(self) -> Iterator[RollbackOperationDescriptor]:
+        """Yield all reverse operations, including nested operations."""
+
+        for operation in self.reverse_operations:
+            yield from operation.iter_self_and_nested()
 
     def to_json_dict(self) -> RollbackMigrationStepJSON:
         """Serialize the rollback step into the stable JSON contract."""
@@ -131,6 +147,8 @@ class RollbackOperationDescriptor:
     """Normalized description of one reverse migration operation."""
 
     index: int
+    path: str
+    context: str
     name: str
     source_name: str
     import_path: str
@@ -139,12 +157,28 @@ class RollbackOperationDescriptor:
     source_description: str
     is_reversible: bool
     is_elidable: bool
+    nested_operations: tuple[RollbackOperationDescriptor, ...] = ()
+
+    @property
+    def operation_count(self) -> int:
+        """Return this reverse operation plus any nested reverse operations."""
+
+        return 1 + sum(operation.operation_count for operation in self.nested_operations)
+
+    def iter_self_and_nested(self) -> Iterator[RollbackOperationDescriptor]:
+        """Yield this reverse operation and recursively yield nested operations."""
+
+        yield self
+        for operation in self.nested_operations:
+            yield from operation.iter_self_and_nested()
 
     def to_json_dict(self) -> RollbackOperationDescriptorJSON:
         """Serialize the reverse operation into the rollback JSON contract."""
 
         return {
             "index": self.index,
+            "path": self.path,
+            "context": self.context,
             "name": self.name,
             "source_name": self.source_name,
             "import_path": self.import_path,
@@ -153,6 +187,7 @@ class RollbackOperationDescriptor:
             "source_description": self.source_description,
             "is_reversible": self.is_reversible,
             "is_elidable": self.is_elidable,
+            "nested_operations": [operation.to_json_dict() for operation in self.nested_operations],
         }
 
 

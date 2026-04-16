@@ -17,8 +17,30 @@ class DestructiveSchemaRule:
 
     def evaluate(self, step: PlannedMigrationStep) -> tuple[RiskFinding, ...]:
         findings: list[RiskFinding] = []
-        for operation in step.operations:
+        for operation in step.iter_operations():
             if operation.name == "RemoveField":
+                if operation.context == "state":
+                    findings.append(
+                        RiskFinding(
+                            rule_id=self.rule_id,
+                            kind=RiskFindingKind.REVIEW,
+                            severity=RiskSeverity.MEDIUM,
+                            migration=step.key,
+                            operation_index=operation.index,
+                            operation_path=operation.path,
+                            operation_name=operation.name,
+                            message=(
+                                "A nested state operation removes a field from Django's migration "
+                                "state. This does not drop data by itself, but it often pairs with "
+                                "manual database changes that need review."
+                            ),
+                            recommendation=(
+                                "Review the matching database operation and confirm the real "
+                                "column change is safe and reversible."
+                            ),
+                        )
+                    )
+                    continue
                 findings.append(
                     RiskFinding(
                         rule_id=self.rule_id,
@@ -26,6 +48,7 @@ class DestructiveSchemaRule:
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
+                        operation_path=operation.path,
                         operation_name=operation.name,
                         message="Removing a field can drop stored data and complicate recovery.",
                         recommendation=(
@@ -35,6 +58,28 @@ class DestructiveSchemaRule:
                     )
                 )
             elif operation.name == "DeleteModel":
+                if operation.context == "state":
+                    findings.append(
+                        RiskFinding(
+                            rule_id=self.rule_id,
+                            kind=RiskFindingKind.REVIEW,
+                            severity=RiskSeverity.MEDIUM,
+                            migration=step.key,
+                            operation_index=operation.index,
+                            operation_path=operation.path,
+                            operation_name=operation.name,
+                            message=(
+                                "A nested state operation deletes a model from Django's migration "
+                                "state. This does not drop the table by itself, but it often pairs "
+                                "with manual database changes that need review."
+                            ),
+                            recommendation=(
+                                "Review the matching database operation and confirm the real table "
+                                "change is safe and reversible."
+                            ),
+                        )
+                    )
+                    continue
                 findings.append(
                     RiskFinding(
                         rule_id=self.rule_id,
@@ -42,6 +87,7 @@ class DestructiveSchemaRule:
                         severity=RiskSeverity.HIGH,
                         migration=step.key,
                         operation_index=operation.index,
+                        operation_path=operation.path,
                         operation_name=operation.name,
                         message="Deleting a model can remove an entire table and all stored rows.",
                         recommendation=(

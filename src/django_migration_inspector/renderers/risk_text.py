@@ -20,6 +20,12 @@ def _pluralize(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {noun}"
 
 
+def _format_operation_reference(*, operation_index: int, operation_path: str) -> str:
+    if operation_path == str(operation_index):
+        return f"op #{operation_index}"
+    return f"op {operation_path}"
+
+
 @dataclass(frozen=True, slots=True)
 class RiskTextRenderOptions:
     """Configuration for risk text rendering."""
@@ -312,12 +318,16 @@ class TextRiskReportRenderer:
             return lines
 
         for finding in report.findings:
+            operation_reference = _format_operation_reference(
+                operation_index=finding.operation_index,
+                operation_path=finding.operation_path,
+            )
             lines.extend(
                 [
                     (
                         "  - "
                         f"[{finding.kind.value.upper()}] {finding.migration.identifier} "
-                        f"(op #{finding.operation_index}: {finding.operation_name})"
+                        f"({operation_reference}: {finding.operation_name})"
                     ),
                     f"    {finding.message}",
                     f"    Recommendation: {finding.recommendation}",
