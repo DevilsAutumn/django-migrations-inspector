@@ -14,6 +14,7 @@ Generate it with:
 
 ```bash
 python manage.py migration_inspect --format mermaid
+python manage.py migration_inspect --offline --format mermaid
 ```
 
 Example shape of the output:
@@ -44,6 +45,7 @@ Generate it with:
 
 ```bash
 python manage.py migration_inspect --format dot
+python manage.py migration_inspect --offline --format dot
 ```
 
 Example shape of the output:

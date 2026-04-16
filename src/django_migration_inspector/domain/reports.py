@@ -39,6 +39,7 @@ class GraphInspectionReportJSON(TypedDict):
     schema_version: str
     report_type: str
     database_alias: str
+    offline: bool
     selected_app_label: str | None
     total_apps: int
     total_migrations: int
@@ -69,6 +70,7 @@ class RiskAssessmentReportJSON(TypedDict):
     schema_version: str
     report_type: str
     database_alias: str
+    offline: bool
     selected_app_label: str | None
     analysis_scope: str
     decision: str
@@ -178,6 +180,7 @@ class GraphInspectionReport:
     multiple_head_apps: tuple[AppHeadGroup, ...]
     dependency_hotspots: tuple[DependencyHotspot, ...]
     nodes: tuple[MigrationNode, ...]
+    offline: bool = False
 
     def to_json_dict(self) -> GraphInspectionReportJSON:
         """Serialize the report into the stable JSON contract."""
@@ -186,6 +189,7 @@ class GraphInspectionReport:
             "schema_version": REPORT_SCHEMA_VERSION,
             "report_type": "graph_inspection",
             "database_alias": self.database_alias,
+            "offline": self.offline,
             "selected_app_label": self.selected_app_label,
             "total_apps": self.total_apps,
             "total_migrations": self.total_migrations,
@@ -240,6 +244,7 @@ class RiskAssessmentReport:
     rollback_safe: bool
     findings: tuple[RiskFinding, ...]
     plan: ForwardMigrationPlan
+    offline: bool = False
 
     @property
     def analysis_scope(self) -> RiskAnalysisScope:
@@ -346,6 +351,7 @@ class RiskAssessmentReport:
             "schema_version": REPORT_SCHEMA_VERSION,
             "report_type": "risk_assessment",
             "database_alias": self.database_alias,
+            "offline": self.offline,
             "selected_app_label": self.selected_app_label,
             "analysis_scope": self.analysis_scope.value,
             "decision": self.decision.value,

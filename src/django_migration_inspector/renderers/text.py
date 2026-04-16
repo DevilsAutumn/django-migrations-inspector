@@ -85,20 +85,31 @@ class TextGraphReportRenderer:
                 else f"Visible apps: {report.total_apps}"
             ),
             f"Visible migrations: {report.total_migrations}",
-            "",
-            "Summary:",
-            (
-                f"  - {_pluralize(len(report.multiple_head_apps), 'app')} "
-                f"{_have_verb(len(report.multiple_head_apps))} multiple heads."
-            ),
-            (
-                f"  - {_pluralize(len(report.merge_nodes), 'merge migration')} "
-                f"{_be_verb(len(report.merge_nodes))} present."
-            ),
-            "  - "
-            f"{_pluralize(len(report.dependency_hotspots), 'dependency hotspot')} may affect "
-            "planning.",
         ]
+        if report.offline:
+            lines.append("Source: migration files only (offline)")
+
+        lines.extend(
+            [
+                "",
+                "Summary:",
+            ]
+        )
+        lines.extend(
+            [
+                (
+                    f"  - {_pluralize(len(report.multiple_head_apps), 'app')} "
+                    f"{_have_verb(len(report.multiple_head_apps))} multiple heads."
+                ),
+                (
+                    f"  - {_pluralize(len(report.merge_nodes), 'merge migration')} "
+                    f"{_be_verb(len(report.merge_nodes))} present."
+                ),
+                "  - "
+                f"{_pluralize(len(report.dependency_hotspots), 'dependency hotspot')} may affect "
+                "planning.",
+            ]
+        )
 
         lines.extend(["", "Graph issues:"])
         if not report.multiple_head_apps and not report.merge_nodes:
@@ -136,12 +147,16 @@ class TextGraphReportRenderer:
                 ]
             )
         elif report.root_nodes or report.leaf_nodes:
+            command = (
+                "python manage.py migration_inspect --offline --details"
+                if report.offline
+                else "python manage.py migration_inspect --details"
+            )
             lines.extend(
                 [
                     "",
                     "Next step:",
-                    "  - Run `python manage.py migration_inspect --details` for root and leaf "
-                    "migration lists.",
+                    f"  - Run `{command}` for root and leaf migration lists.",
                 ]
             )
         return "\n".join(lines) + "\n"

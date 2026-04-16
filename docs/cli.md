@@ -22,8 +22,10 @@ of the real rollback path.
 
 ```bash
 python manage.py migration_inspect
+python manage.py migration_inspect --offline
 python manage.py migration_inspect risk
 python manage.py migration_inspect audit
+python manage.py migration_inspect audit --offline
 python manage.py migration_inspect rollback billing 0001_initial
 python manage.py migration_inspect rollback inventory 0001_initial --why-app catalog
 ```
@@ -80,6 +82,22 @@ Choose the Django database alias used when loading migration state:
 python manage.py migration_inspect --database default
 ```
 
+#### `--offline`
+
+Load migration files without connecting to the configured database:
+
+```bash
+python manage.py migration_inspect --offline
+python manage.py migration_inspect audit --offline
+python manage.py migration_inspect --offline --format mermaid
+```
+
+`--offline` is supported for `inspect` and `audit`. It is useful when you want to scan a large
+project before setting up Postgres, MySQL, or local credentials.
+
+`risk` and `rollback` still need a real database connection because they depend on the current
+applied migration state in the `django_migrations` table.
+
 #### `--output`
 
 Write the rendered report to a file instead of stdout:
@@ -106,6 +124,8 @@ python manage.py migration_inspect risk --app billing
 
 It does not currently support `mermaid` or `dot`.
 
+`risk` cannot run with `--offline` because pending migrations depend on the current database state.
+
 The default text output is summary-first:
 
 1. Decision: `CLEAR`, `REVIEW REQUIRED`, or `ROLLBACK BLOCKED`
@@ -125,6 +145,7 @@ Audit all visible migrations on disk rather than only the pending forward plan:
 ```bash
 python manage.py migration_inspect audit
 python manage.py migration_inspect audit --json
+python manage.py migration_inspect audit --offline
 python manage.py migration_inspect audit --app billing
 ```
 
@@ -137,11 +158,14 @@ It does not currently support `mermaid` or `dot`.
 
 The default text output is summary-first:
 
-1. Decision for the visible migration history
-2. Risky migration count by app
-3. Top historical migrations that deserve review
+1. Decision: `CLEAR`, `REVIEW REQUIRED`, or `IRREVERSIBLE FOUND`
+2. Counts for irreversible, destructive, and review-needed migrations
+3. Risky migration count by app
+4. Top historical migrations that deserve review
 
 Use `--details` for the full finding list.
+
+Use `audit --offline` when you want a file-only review of a project whose database is not set up.
 
 #### `rollback APP_LABEL MIGRATION_NAME`
 
@@ -169,6 +193,9 @@ It does not currently support `mermaid` or `dot`.
 
 Text rollback output is summary-first by default, so large rollback plans do not flood the terminal.
 Use the following flags to expand detail only when you need it:
+
+Rollback cannot run with `--offline` because the reverse plan depends on applied migrations in the
+database.
 
 #### `--details`
 

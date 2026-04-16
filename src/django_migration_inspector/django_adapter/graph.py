@@ -112,11 +112,13 @@ def build_graph_snapshot(
 class DjangoMigrationGraphProvider:
     """Production graph provider backed by Django migration internals."""
 
-    def build_snapshot(self, database_alias: str) -> MigrationGraphSnapshot:
+    def build_snapshot(
+        self, database_alias: str, *, offline: bool = False
+    ) -> MigrationGraphSnapshot:
         """Build a normalized snapshot for the requested database alias."""
 
         validate_supported_django_version()
-        loader = load_migration_loader(database_alias=database_alias)
+        loader = load_migration_loader(database_alias=database_alias, offline=offline)
         return build_graph_snapshot(
             loader=loader,
             ignored_app_labels=build_ignored_app_labels(),

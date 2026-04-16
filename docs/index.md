@@ -13,7 +13,7 @@ The current implementation already provides:
 
 1. Typed migration graph loading.
 2. Graph checks focused on multiple heads, merge nodes, and dependency hotspots.
-3. Risk analysis that separates rollback blockers, destructive changes, and review-needed migrations.
+3. Risk analysis that separates rollback blockers, irreversible history, destructive changes, and review-needed migrations.
 4. Rollback simulation with blockers, blast radius, cross-app impact, and reverse-step previews.
 5. Local-first output in text, JSON, Mermaid, and Graphviz DOT.
 6. A reusable Django management command that works in local development and CI.

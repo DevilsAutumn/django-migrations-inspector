@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+from typing import NoReturn
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
+from pytest import MonkeyPatch
 from pytest_django.plugin import DjangoDbBlocker
 
 from django_migration_inspector.config import RiskConfig
@@ -72,6 +75,63 @@ def test_management_command_supports_audit_subcommand_json(
     report = json.loads(output.getvalue())
     assert report["report_type"] == "risk_assessment"
     assert report["analysis_scope"] == "history"
+
+
+def test_management_command_renders_audit_text_with_file_review_language(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        call_command("migration_inspect", "audit", "--offline", stdout=output)
+
+    rendered = output.getvalue()
+    assert "Decision: IRREVERSIBLE FOUND" in rendered
+    assert "contains irreversible operations" in rendered
+    assert "ROLLBACK BLOCKED" not in rendered
+    assert "rollback blocker" not in rendered
+
+
+def test_management_command_supports_offline_audit(monkeypatch: MonkeyPatch) -> None:
+    output = StringIO()
+
+    def fail_database_connection(database_alias: str) -> NoReturn:
+        raise AssertionError(f"Unexpected database connection for {database_alias}.")
+
+    monkeypatch.setattr(
+        "django_migration_inspector.django_adapter.loader.get_database_connection",
+        fail_database_connection,
+    )
+
+    call_command("migration_inspect", "audit", "--offline", "--json", stdout=output)
+
+    report = json.loads(output.getvalue())
+    assert report["report_type"] == "risk_assessment"
+    assert report["offline"] is True
+    assert report["analysis_scope"] == "history"
+    assert report["analyzed_migration_count"] == 11
+
+
+def test_management_command_rejects_offline_pending_risk() -> None:
+    output = StringIO()
+
+    try:
+        call_command("migration_inspect", "risk", "--offline", stdout=output)
+    except CommandError as error:
+        assert "pending migrations depend on the current applied migration state" in str(error)
+    else:
+        raise AssertionError("Expected risk --offline to fail.")
+
+
+def test_management_command_rejects_offline_rollback() -> None:
+    output = StringIO()
+
+    try:
+        call_command("migration_inspect", "rollback", "billing", "zero", "--offline", stdout=output)
+    except CommandError as error:
+        assert "rollback simulation needs the current applied migration state" in str(error)
+    else:
+        raise AssertionError("Expected rollback --offline to fail.")
 
 
 def test_management_command_renders_risk_text_for_one_app(
