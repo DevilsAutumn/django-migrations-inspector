@@ -38,6 +38,12 @@ Run the graph inspection command from your Django project:
 python manage.py migration_inspect
 ```
 
+If the database is not set up yet, scan migration files only:
+
+```bash
+python manage.py migration_inspect --offline
+```
+
 By default, the command ignores Django built-in apps and third-party apps so the report focuses on
 your project code.
 
@@ -79,6 +85,7 @@ To audit migration files already on disk, even when nothing is pending:
 
 ```bash
 python manage.py migration_inspect audit
+python manage.py migration_inspect audit --offline
 python manage.py migration_inspect audit --app billing
 python manage.py migration_inspect audit --details
 ```

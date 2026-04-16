@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from django_migration_inspector.analyzers import RiskEngine
@@ -24,6 +24,7 @@ class ForwardPlanProvider(Protocol):
         *,
         database_alias: str,
         app_label: str | None = None,
+        offline: bool = False,
     ) -> ForwardMigrationPlan:
         """Build a forward plan for the requested scope."""
 
@@ -47,8 +48,10 @@ class RiskInspectionService:
         plan = plan_provider.build_plan(
             database_alias=config.database_alias,
             app_label=config.app_label,
+            offline=config.offline,
         )
-        return self.risk_engine.analyze(plan)
+        report = self.risk_engine.analyze(plan)
+        return replace(report, offline=config.offline)
 
 
 def build_default_risk_service() -> RiskInspectionService:

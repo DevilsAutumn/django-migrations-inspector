@@ -65,7 +65,7 @@ class TextRiskReportRenderer:
         lines = [
             title,
             "=" * len(title),
-            f"Decision: {self._format_decision(report.decision)}",
+            f"Decision: {self._format_decision(report)}",
             (
                 f"Pending migrations: {report.pending_migration_count}"
                 if is_pending_scope
@@ -80,6 +80,8 @@ class TextRiskReportRenderer:
             lines.append(f"Scope: {report.selected_app_label}")
         if report.database_alias != "default":
             lines.append(f"Database alias: {report.database_alias}")
+        if report.offline:
+            lines.append("Source: migration files only (offline)")
 
         lines.extend(self._render_summary(report))
         lines.extend(self._render_app_summary(report))
@@ -92,10 +94,12 @@ class TextRiskReportRenderer:
 
         return "\n".join(lines) + "\n"
 
-    def _format_decision(self, decision: RiskDecision) -> str:
-        if decision is RiskDecision.ROLLBACK_BLOCKED:
+    def _format_decision(self, report: RiskAssessmentReport) -> str:
+        if report.decision is RiskDecision.ROLLBACK_BLOCKED:
+            if report.analysis_scope is RiskAnalysisScope.HISTORY:
+                return "IRREVERSIBLE FOUND"
             return "ROLLBACK BLOCKED"
-        if decision is RiskDecision.REVIEW_REQUIRED:
+        if report.decision is RiskDecision.REVIEW_REQUIRED:
             return "REVIEW REQUIRED"
         return "CLEAR"
 
@@ -113,11 +117,19 @@ class TextRiskReportRenderer:
             return lines
 
         if report.blocked_migration_count:
+            blocked_message = (
+                "contain irreversible operations."
+                if report.analysis_scope is RiskAnalysisScope.HISTORY
+                else "block a clean rollback path."
+            )
+            if report.blocked_migration_count == 1:
+                blocked_message = (
+                    "contains irreversible operations."
+                    if report.analysis_scope is RiskAnalysisScope.HISTORY
+                    else "blocks a clean rollback path."
+                )
             lines.append(
-                "  - "
-                f"{_pluralize(report.blocked_migration_count, 'migration')} "
-                f"{'blocks' if report.blocked_migration_count == 1 else 'block'} a clean "
-                "rollback path."
+                f"  - {_pluralize(report.blocked_migration_count, 'migration')} {blocked_message}"
             )
         if report.destructive_migration_count:
             lines.append(
@@ -145,7 +157,16 @@ class TextRiskReportRenderer:
         for summary in displayed:
             detail_parts: list[str] = [_pluralize(summary.risky_migration_count, "migration")]
             if summary.blocked_migration_count:
-                detail_parts.append(_pluralize(summary.blocked_migration_count, "blocker"))
+                detail_parts.append(
+                    _pluralize(
+                        summary.blocked_migration_count,
+                        (
+                            "irreversible migration"
+                            if report.analysis_scope is RiskAnalysisScope.HISTORY
+                            else "blocker"
+                        ),
+                    )
+                )
             if summary.destructive_migration_count:
                 detail_parts.append(
                     _pluralize(summary.destructive_migration_count, "destructive change")
@@ -208,7 +229,16 @@ class TextRiskReportRenderer:
         for summary in displayed:
             labels: list[str] = []
             if summary.blocked_count:
-                labels.append(_pluralize(summary.blocked_count, "rollback blocker"))
+                labels.append(
+                    _pluralize(
+                        summary.blocked_count,
+                        (
+                            "irreversible operation"
+                            if report.analysis_scope is RiskAnalysisScope.HISTORY
+                            else "rollback blocker"
+                        ),
+                    )
+                )
             if summary.destructive_count:
                 labels.append(_pluralize(summary.destructive_count, "destructive change"))
             if summary.review_count:
@@ -301,6 +331,8 @@ class TextRiskReportRenderer:
             if report.analysis_scope is RiskAnalysisScope.PENDING
             else "python manage.py migration_inspect audit --details"
         )
+        if report.offline and report.analysis_scope is RiskAnalysisScope.HISTORY:
+            command = "python manage.py migration_inspect audit --offline --details"
         if not report.findings:
             return []
         return ["", "Next step:", f"  - Run `{command}` for the full per-operation review."]

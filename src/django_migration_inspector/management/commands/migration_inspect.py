@@ -68,6 +68,14 @@ class Command(BaseCommand):
             help="Django database alias used for migration state loading.",
         )
         parser.add_argument(
+            "--offline",
+            action="store_true",
+            help=(
+                "Load migration files without connecting to the database. "
+                "Supported for inspect and audit modes only."
+            ),
+        )
+        parser.add_argument(
             "--output",
             default=None,
             help="Write the rendered report to a file instead of stdout.",
@@ -110,6 +118,7 @@ class Command(BaseCommand):
                 mode_args=tuple(str(value) for value in raw_mode_args),
             )
             database_alias = str(options["database"])
+            offline = bool(options["offline"])
             output_path = self._normalize_optional_string(options["output"])
             raw_app_label = options["app_label"]
             app_label = None if raw_app_label in (None, "") else str(raw_app_label)
@@ -123,6 +132,7 @@ class Command(BaseCommand):
                 details=details,
                 show_operations=show_operations,
                 why_app=why_app,
+                offline=offline,
             )
 
             if requested_mode in {"risk", "audit"}:
@@ -139,6 +149,7 @@ class Command(BaseCommand):
                         if requested_mode == "audit"
                         else RiskAnalysisScope.PENDING
                     ),
+                    offline=offline,
                 )
                 risk_service = build_default_risk_service()
                 risk_report = risk_service.inspect_risk(config=risk_config)
@@ -191,6 +202,7 @@ class Command(BaseCommand):
                     output_format=output_format,
                     database_alias=database_alias,
                     app_label=app_label,
+                    offline=offline,
                 )
                 graph_service = build_default_inspect_service()
                 graph_report = graph_service.inspect_graph(config=inspect_config)
@@ -265,14 +277,27 @@ class Command(BaseCommand):
         details: bool,
         show_operations: bool,
         why_app: str | None,
+        offline: bool,
     ) -> None:
         if requested_mode == "rollback":
+            if offline:
+                raise CommandError(
+                    "--offline cannot be used with rollback because rollback simulation needs "
+                    "the current applied migration state from the database."
+                )
             if output_format is OutputFormat.JSON and (details or show_operations or why_app):
                 raise CommandError(
                     "--details, --show-operations, and --why-app are available only for "
                     "text rollback output."
                 )
             return
+
+        if requested_mode == "risk" and offline:
+            raise CommandError(
+                "--offline cannot be used with risk because pending migrations depend on the "
+                "current applied migration state from the database. Use `audit --offline` for a "
+                "file-only migration review."
+            )
 
         if requested_mode in {"risk", "audit", "inspect"}:
             if show_operations or why_app is not None:

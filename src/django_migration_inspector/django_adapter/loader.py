@@ -130,8 +130,10 @@ def get_database_connection(database_alias: str) -> BaseDatabaseWrapper:
     return connection
 
 
-def load_migration_loader(database_alias: str) -> MigrationLoader:
-    """Load Django's migration graph and applied migration state."""
+def load_migration_loader(database_alias: str, *, offline: bool = False) -> MigrationLoader:
+    """Load Django's migration graph, optionally without database state."""
 
+    if offline:
+        return MigrationLoader(connection=None, ignore_no_migrations=True)
     connection = get_database_connection(database_alias)
     return MigrationLoader(connection=connection, ignore_no_migrations=True)

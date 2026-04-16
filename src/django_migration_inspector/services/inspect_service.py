@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from django_migration_inspector.analyzers import GraphIntelligenceAnalyzer
@@ -17,7 +17,9 @@ from django_migration_inspector.exceptions import MigrationInspectionError
 class MigrationGraphProvider(Protocol):
     """Protocol for graph snapshot providers."""
 
-    def build_snapshot(self, database_alias: str) -> MigrationGraphSnapshot:
+    def build_snapshot(
+        self, database_alias: str, *, offline: bool = False
+    ) -> MigrationGraphSnapshot:
         """Build a graph snapshot for the requested database alias."""
 
 
@@ -35,12 +37,16 @@ class InspectService:
             raise MigrationInspectionError(
                 f"App {config.app_label!r} is ignored because it is not a user project app."
             )
-        snapshot = self.graph_provider.build_snapshot(database_alias=config.database_alias)
-        return self.graph_analyzer.analyze(
+        snapshot = self.graph_provider.build_snapshot(
+            database_alias=config.database_alias,
+            offline=config.offline,
+        )
+        report = self.graph_analyzer.analyze(
             snapshot,
             database_alias=config.database_alias,
             app_label=config.app_label,
         )
+        return replace(report, offline=config.offline)
 
 
 def build_default_inspect_service() -> InspectService:

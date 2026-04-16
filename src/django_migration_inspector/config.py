@@ -15,6 +15,7 @@ class InspectConfig:
     output_format: OutputFormat = OutputFormat.TEXT
     database_alias: str = DEFAULT_DATABASE_ALIAS
     app_label: str | None = None
+    offline: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class RiskConfig:
     database_alias: str = DEFAULT_DATABASE_ALIAS
     app_label: str | None = None
     scope: RiskAnalysisScope = RiskAnalysisScope.PENDING
+    offline: bool = False
 
 
 @dataclass(frozen=True, slots=True)
