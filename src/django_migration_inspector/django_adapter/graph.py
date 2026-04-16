@@ -54,10 +54,10 @@ def build_graph_snapshot(
     """Normalize the loaded Django migration graph into immutable domain objects."""
 
     migration_nodes: list[MigrationNode] = []
-    for raw_key in sorted(loader.disk_migrations, key=lambda item: (item[0], item[1])):
+    for raw_key in sorted(loader.graph.nodes, key=lambda item: (item[0], item[1])):
         if raw_key[0] in ignored_app_labels:
             continue
-        migration = loader.disk_migrations[raw_key]
+        migration = loader.graph.nodes[raw_key]
         graph_node = loader.graph.node_map[raw_key]
         migration_key = MigrationNodeKey.from_tuple(raw_key)
         operations = tuple(

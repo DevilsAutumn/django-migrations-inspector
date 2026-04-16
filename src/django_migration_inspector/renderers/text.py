@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django_migration_inspector.domain.keys import MigrationNodeKey
+from django_migration_inspector.domain.models import MigrationNode
 from django_migration_inspector.domain.reports import (
     AppHeadGroup,
     DependencyHotspot,
@@ -57,6 +58,10 @@ def _format_hotspots(dependency_hotspots: tuple[DependencyHotspot, ...]) -> list
     ]
 
 
+def _find_squashed_nodes(report: GraphInspectionReport) -> tuple[MigrationNode, ...]:
+    return tuple(node for node in report.nodes if node.replaces)
+
+
 @dataclass(frozen=True, slots=True)
 class GraphTextRenderOptions:
     """Configuration for graph text rendering."""
@@ -75,6 +80,7 @@ class TextGraphReportRenderer:
 
         title = "Django Migration Inspector Graph Check"
         decision = "REVIEW GRAPH" if report.multiple_head_apps or report.merge_nodes else "CLEAR"
+        squashed_nodes = _find_squashed_nodes(report)
         lines = [
             title,
             "=" * len(title),
@@ -110,6 +116,12 @@ class TextGraphReportRenderer:
                 "planning.",
             ]
         )
+        if squashed_nodes:
+            lines.append(
+                "  - "
+                f"{_pluralize(len(squashed_nodes), 'squashed migration')} "
+                f"{_be_verb(len(squashed_nodes))} active in this graph."
+            )
 
         lines.extend(["", "Graph issues:"])
         if not report.multiple_head_apps and not report.merge_nodes:

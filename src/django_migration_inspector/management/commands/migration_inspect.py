@@ -7,7 +7,21 @@ from argparse import ArgumentParser
 from pathlib import Path
 from pydoc import pager
 
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError
+from django.db.migrations.exceptions import (
+    AmbiguityError,
+    BadMigrationError,
+    CircularDependencyError,
+    InconsistentMigrationHistory,
+    InvalidBasesError,
+    InvalidMigrationPlan,
+    IrreversibleError,
+    MigrationSchemaMissing,
+    NodeNotFoundError,
+)
+from django.db.utils import DatabaseError as DjangoDatabaseError
+from django.utils.connection import ConnectionDoesNotExist
 
 from django_migration_inspector.config import InspectConfig, RiskConfig, RollbackConfig
 from django_migration_inspector.domain.enums import OutputFormat, RiskAnalysisScope
@@ -27,6 +41,17 @@ from django_migration_inspector.services import (
 )
 
 SIMPLE_MODES = ("inspect", "risk", "audit", "rollback")
+MIGRATION_GRAPH_ERRORS = (
+    AmbiguityError,
+    BadMigrationError,
+    CircularDependencyError,
+    InconsistentMigrationHistory,
+    InvalidBasesError,
+    InvalidMigrationPlan,
+    IrreversibleError,
+    MigrationSchemaMissing,
+    NodeNotFoundError,
+)
 
 
 class Command(BaseCommand):
@@ -217,6 +242,31 @@ class Command(BaseCommand):
                 )
         except DjangoMigrationInspectorError as error:
             raise CommandError(str(error)) from error
+        except ConnectionDoesNotExist as error:
+            raise CommandError(
+                f"Unknown database alias. Check your Django DATABASES setting. {error}"
+            ) from error
+        except ImproperlyConfigured as error:
+            raise CommandError(f"Django is not configured correctly: {error}") from error
+        except MIGRATION_GRAPH_ERRORS as error:
+            raise CommandError(
+                "Django could not load a consistent migration graph. "
+                f"Fix the migration files first, then run this command again. Details: {error}"
+            ) from error
+        except DjangoDatabaseError as error:
+            raise CommandError(
+                f"Django hit a database error while reading migration state. Details: {error}"
+            ) from error
+        except (ImportError, SyntaxError) as error:
+            raise CommandError(
+                "Django could not import one of the project or migration modules. "
+                f"Fix the import error first, then run this command again. Details: {error}"
+            ) from error
+        except OSError as error:
+            raise CommandError(
+                "Django could not read one of the project or migration files. "
+                f"Fix the filesystem error first, then run this command again. Details: {error}"
+            ) from error
 
         return None
 
@@ -322,7 +372,12 @@ class Command(BaseCommand):
         output_path: str | None,
     ) -> None:
         if output_path is not None:
-            Path(output_path).write_text(rendered_output, encoding="utf-8")
+            try:
+                Path(output_path).expanduser().write_text(rendered_output, encoding="utf-8")
+            except OSError as error:
+                raise CommandError(
+                    f"Could not write migration report to {output_path!r}: {error}"
+                ) from error
             return
 
         if output_format is OutputFormat.TEXT and self._should_page_output(

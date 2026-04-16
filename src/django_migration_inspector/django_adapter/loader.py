@@ -8,10 +8,12 @@ from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urlparse
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.migrations.loader import MigrationLoader
-from django.db.utils import OperationalError
+from django.db.utils import DatabaseError, OperationalError
+from django.utils.connection import ConnectionDoesNotExist
 
 from django_migration_inspector.exceptions import MigrationInspectionError
 
@@ -112,20 +114,38 @@ def get_database_connection(database_alias: str) -> BaseDatabaseWrapper:
 
     try:
         connection = connections[database_alias]
-    except KeyError as error:
+    except ConnectionDoesNotExist as error:
         raise MigrationInspectionError(
             f"Unknown database alias {database_alias!r}. Check your Django DATABASES setting."
         ) from error
+    except ImproperlyConfigured as error:
+        raise MigrationInspectionError(
+            f"Django database alias {database_alias!r} is not configured correctly: {error}"
+        ) from error
 
-    _hydrate_connection_settings_from_dotenv(connection, database_alias=database_alias)
+    try:
+        _hydrate_connection_settings_from_dotenv(connection, database_alias=database_alias)
+    except ValueError as error:
+        raise MigrationInspectionError(
+            f"Could not parse database configuration for alias {database_alias!r}: {error}"
+        ) from error
+
     try:
         connection.ensure_connection()
     except OperationalError as error:
         raise MigrationInspectionError(
-            "Failed to connect to the configured Django database. "
+            f"Failed to connect to Django database alias {database_alias!r}. "
             "If your project stores DB credentials in a local .env file, ensure "
             "python-dotenv is installed in the active venv and that the file contains "
-            "DATABASE_URL or POSTGRES_/DB_ values."
+            f"DATABASE_URL or POSTGRES_/DB_ values. Original error: {error}"
+        ) from error
+    except ImproperlyConfigured as error:
+        raise MigrationInspectionError(
+            f"Django database alias {database_alias!r} is not configured correctly: {error}"
+        ) from error
+    except DatabaseError as error:
+        raise MigrationInspectionError(
+            f"Django could not read migration state from database alias {database_alias!r}: {error}"
         ) from error
     return connection
 
