@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django_migration_inspector.domain.enums import RiskSeverity
-from django_migration_inspector.domain.plans import RollbackMigrationPlan, RollbackMigrationStep
+from django_migration_inspector.domain.plans import (
+    RollbackMigrationPlan,
+    RollbackMigrationStep,
+    RollbackOperationDescriptor,
+)
 from django_migration_inspector.domain.reports import (
     RollbackBlocker,
     RollbackConcern,
@@ -77,7 +81,7 @@ class RollbackSimulator:
         seen_cross_apps: set[str] = set()
 
         for step in plan.steps:
-            concerns.extend(self._build_step_concerns(plan=plan, step=step))
+            concerns.extend(self._build_step_concerns(step=step))
 
             if (
                 step.key.app_label != plan.target_app_label
@@ -126,84 +130,125 @@ class RollbackSimulator:
     def _build_step_concerns(
         self,
         *,
-        plan: RollbackMigrationPlan,
         step: RollbackMigrationStep,
     ) -> list[RollbackConcern]:
         concerns: list[RollbackConcern] = []
         for operation in step.reverse_operations:
-            if operation.source_name == "RemoveField":
-                concerns.append(
-                    RollbackConcern(
-                        category="data_loss_reversal",
-                        severity=RiskSeverity.HIGH,
-                        migration=step.key,
-                        operation_index=operation.index,
-                        operation_name=operation.source_name,
-                        message=(
-                            "Reversing a field removal restores schema shape but cannot recover "
-                            "the dropped field data automatically."
-                        ),
-                        recommendation=(
-                            "Confirm whether backups or a data restoration plan exist before "
-                            "using rollback as a recovery strategy."
-                        ),
-                    )
-                )
-            elif operation.source_name == "DeleteModel":
-                concerns.append(
-                    RollbackConcern(
-                        category="table_restore",
-                        severity=RiskSeverity.HIGH,
-                        migration=step.key,
-                        operation_index=operation.index,
-                        operation_name=operation.source_name,
-                        message=(
-                            "Reversing a model deletion can recreate the table structure but does "
-                            "not restore deleted rows."
-                        ),
-                        recommendation=(
-                            "Treat this rollback as schema-only unless you also have a data "
-                            "restoration plan."
-                        ),
-                    )
-                )
-            elif operation.source_name == "RunPython":
-                concerns.append(
-                    RollbackConcern(
-                        category="reverse_data_migration",
-                        severity=RiskSeverity.MEDIUM,
-                        migration=step.key,
-                        operation_index=operation.index,
-                        operation_name=operation.source_name,
-                        message=(
-                            "Rollback includes custom Python data logic, which may still be slow "
-                            "or operationally risky even when technically reversible."
-                        ),
-                        recommendation=(
-                            "Review data volume, query patterns, and runtime before executing the "
-                            "rollback in a production environment."
-                        ),
-                    )
-                )
-            elif operation.source_name == "RunSQL":
-                concerns.append(
-                    RollbackConcern(
-                        category="reverse_sql",
-                        severity=RiskSeverity.HIGH,
-                        migration=step.key,
-                        operation_index=operation.index,
-                        operation_name=operation.source_name,
-                        message=(
-                            "Rollback includes raw SQL, which may have backend-specific lock or "
-                            "transaction behavior."
-                        ),
-                        recommendation=(
-                            "Review the reverse SQL against the target database engine and test "
-                            "it in a representative environment first."
-                        ),
-                    )
-                )
+            concern = self._build_operation_concern(step=step, operation=operation)
+            if concern is not None:
+                concerns.append(concern)
         return concerns
+
+    def _build_operation_concern(
+        self,
+        *,
+        step: RollbackMigrationStep,
+        operation: RollbackOperationDescriptor,
+    ) -> RollbackConcern | None:
+        if operation.name == "RemoveField":
+            return RollbackConcern(
+                category="rollback_removes_field",
+                severity=RiskSeverity.HIGH,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.name,
+                message=(
+                    "Rollback will remove a field added by this migration. That is expected "
+                    "during rollback, but it deletes any data stored in that column after the "
+                    "migration was applied."
+                ),
+                recommendation=(
+                    "Confirm the column data is disposable or backed up before executing this "
+                    "rollback."
+                ),
+            )
+
+        if operation.name == "DeleteModel":
+            return RollbackConcern(
+                category="rollback_drops_table",
+                severity=RiskSeverity.HIGH,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.name,
+                message=(
+                    "Rollback will drop a table created by this migration. That is expected "
+                    "during rollback, but it deletes rows created after the migration was applied."
+                ),
+                recommendation=(
+                    "Confirm the table data is disposable or backed up before executing this "
+                    "rollback."
+                ),
+            )
+
+        if operation.source_name == "RemoveField":
+            return RollbackConcern(
+                category="data_loss_reversal",
+                severity=RiskSeverity.HIGH,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.source_name,
+                message=(
+                    "Reversing a field removal restores schema shape but cannot recover the "
+                    "dropped field data automatically."
+                ),
+                recommendation=(
+                    "Confirm whether backups or a data restoration plan exist before using "
+                    "rollback as a recovery strategy."
+                ),
+            )
+
+        if operation.source_name == "DeleteModel":
+            return RollbackConcern(
+                category="table_restore",
+                severity=RiskSeverity.HIGH,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.source_name,
+                message=(
+                    "Reversing a model deletion can recreate the table structure but does not "
+                    "restore deleted rows."
+                ),
+                recommendation=(
+                    "Treat this rollback as schema-only unless you also have a data restoration "
+                    "plan."
+                ),
+            )
+
+        if operation.source_name == "RunPython":
+            return RollbackConcern(
+                category="reverse_data_migration",
+                severity=RiskSeverity.MEDIUM,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.source_name,
+                message=(
+                    "Rollback includes custom Python data logic, which may still be slow or "
+                    "operationally risky even when technically reversible."
+                ),
+                recommendation=(
+                    "Review data volume, query patterns, and runtime before executing the "
+                    "rollback in a production environment."
+                ),
+            )
+
+        if operation.source_name == "RunSQL":
+            return RollbackConcern(
+                category="reverse_sql",
+                severity=RiskSeverity.HIGH,
+                migration=step.key,
+                operation_index=operation.index,
+                operation_name=operation.source_name,
+                message=(
+                    "Rollback includes raw SQL, which may have backend-specific lock or "
+                    "transaction behavior."
+                ),
+                recommendation=(
+                    "Review the reverse SQL against the target database engine and test it in a "
+                    "representative environment first."
+                ),
+            )
+
+        return None
 
     def _calculate_overall_severity(
         self,

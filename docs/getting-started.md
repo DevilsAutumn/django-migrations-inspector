@@ -108,8 +108,9 @@ This reports:
 
 1. Whether rollback is blocked, risky, or clear.
 2. The rollback blast radius across steps and apps.
-3. Which migrations restore schema shape without restoring deleted data.
-4. Why other apps are included.
+3. Which migrations will remove tables or columns added after the target migration.
+4. Which migrations restore schema shape without restoring deleted data.
+5. Why other apps are included.
 
 Use `--details` or `--show-operations` when you need the full rollback plan.
 

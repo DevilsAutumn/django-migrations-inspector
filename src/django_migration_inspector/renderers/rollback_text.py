@@ -117,6 +117,21 @@ class TextRollbackReportRenderer:
                 f"{'blocks' if blocker_migration_count == 1 else 'block'} a clean rollback path."
             )
 
+        rollback_removal_migrations = {
+            concern.migration
+            for concern in report.concerns
+            if concern.category in {"rollback_drops_table", "rollback_removes_field"}
+        }
+        if rollback_removal_migrations:
+            rollback_removal_count = len(rollback_removal_migrations)
+            lines.append(
+                "  - "
+                f"{_pluralize(rollback_removal_count, 'migration')} "
+                f"{'removes' if rollback_removal_count == 1 else 'remove'} tables or columns "
+                "introduced after the target migration. This is expected for rollback, but can "
+                "delete live data."
+            )
+
         schema_restore_migrations = {
             concern.migration
             for concern in report.concerns

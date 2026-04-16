@@ -107,6 +107,33 @@ def test_rollback_service_uses_reverse_operation_labels(
     assert descriptions_by_step["inventory.0001_initial"] == ("Delete model Widget",)
 
 
+def test_rollback_service_marks_expected_reverse_removals_as_high_risk(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    service = build_default_rollback_service()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        report = service.inspect_rollback(
+            RollbackConfig(target_app_label="inventory", target_migration_name="zero")
+        )
+
+    concern_categories = {concern.category for concern in report.concerns}
+
+    assert report.rollback_possible is True
+    assert report.rollback_safe is False
+    assert report.overall_severity is RiskSeverity.HIGH
+    assert not report.blockers
+    assert "rollback_removes_field" in concern_categories
+    assert "rollback_drops_table" in concern_categories
+    assert any("expected during rollback" in concern.message for concern in report.concerns)
+
+
 def test_rollback_service_accepts_unique_migration_prefix(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:
@@ -194,7 +221,8 @@ def test_management_command_supports_rollback_subcommand(
 
     rendered = output.getvalue()
     assert "Target: inventory.zero" in rendered
-    assert "Decision: REVIEW REQUIRED" in rendered
+    assert "Decision: HIGH RISK" in rendered
+    assert "introduced after the target migration" in rendered
     assert "Next step:" in rendered
 
 

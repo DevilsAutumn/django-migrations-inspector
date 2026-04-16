@@ -14,7 +14,7 @@ How the commands work:
 1. `migration_inspect` loads Django's migration graph and reports graph shape: heads, merge migrations, roots, leaves, and dependency hotspots. Add `--offline` to read migration files without opening a database connection.
 2. `migration_inspect risk` asks Django for the pending forward migration plan, then checks those operations with safety rules for destructive schema changes, irreversible data code, raw SQL, and unknown operations. This needs database state.
 3. `migration_inspect audit` uses the same safety rules as `risk`, but scans the migration history instead of only pending migrations. Add `--offline` when you only want to review migration files on disk.
-4. `migration_inspect rollback APP TARGET` asks Django for the reverse plan to reach `TARGET`. `TARGET` can be a full migration name, a unique prefix like `0008`, or `zero`. It checks reversibility and shows any cross-app impact from migration dependencies, but it does not apply the rollback. This needs database state.
+4. `migration_inspect rollback APP TARGET` asks Django for the reverse plan to reach `TARGET`. `TARGET` can be a full migration name, a unique prefix like `0008`, or `zero`. It checks reversibility, expected destructive reverse actions like dropping newly added tables or columns, and cross-app impact from migration dependencies, but it does not apply the rollback. This needs database state.
 
 By default, `inspect`, `risk`, and `audit` ignore Django built-in apps and third-party apps.
 Those reports focus on project apps that live inside your Django project tree rather than

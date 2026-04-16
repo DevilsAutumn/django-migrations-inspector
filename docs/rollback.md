@@ -52,18 +52,19 @@ The simulator currently reports:
 1. Whether rollback is blocked, high risk, or clear.
 2. The rollback blast radius across steps and apps.
 3. Irreversible blockers.
-4. Data-loss reversals such as restoring dropped fields or deleted tables without restoring data.
-5. Cross-app impact caused by dependencies.
-6. Merge-migration warnings.
-7. App-level impact summaries.
-8. Reverse operations in execution order when requested.
+4. Expected but destructive reverse actions, like dropping tables or columns added after the target migration.
+5. Data-loss reversals such as restoring dropped fields or deleted tables without restoring data.
+6. Cross-app impact caused by dependencies.
+7. Merge-migration warnings.
+8. App-level impact summaries.
+9. Reverse operations in execution order when requested.
 
 ## Output modes
 
 The default text output is designed for large rollback plans:
 
 1. Decision and blast radius
-2. Summary of blockers, data-loss reversals, and dependency reach
+2. Summary of blockers, expected destructive reverse actions, data-loss reversals, and dependency reach
 3. Why other apps are included
 4. App impact summary
 5. Top risky migrations
@@ -84,10 +85,11 @@ Rollback is marked as not possible when the reverse path includes irreversible o
 
 The simulator also flags non-blocking but important concerns, including:
 
-1. Recreating schema after dropped data
-2. Raw SQL in the reverse path
-3. Cross-app dependency impact
-4. Merge-topology complexity
+1. Removing tables or columns that were added after the rollback target
+2. Recreating schema after dropped data
+3. Raw SQL in the reverse path
+4. Cross-app dependency impact
+5. Merge-topology complexity
 
 ## Current scope
 
