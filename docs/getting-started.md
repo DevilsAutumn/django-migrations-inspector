@@ -5,7 +5,7 @@
 The package currently targets:
 
 1. Python 3.10+
-2. Django 4.2 through 5.x
+2. Django 4.2 through 6.x
 
 ## Installation
 
