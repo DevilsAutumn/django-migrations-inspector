@@ -34,7 +34,9 @@ def test_management_command_supports_app_filter(django_db_blocker: DjangoDbBlock
         call_command("migration_inspect", "--app", "inventory", stdout=output)
 
     rendered = output.getvalue()
+    assert "Decision: CLEAR" in rendered
     assert "Scope: inventory" in rendered
+    assert "Topology notes:" in rendered
     assert "inventory.0003_merge_0002_add_sku_0002_add_status" in rendered
 
 

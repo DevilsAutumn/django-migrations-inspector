@@ -79,7 +79,7 @@ class TextGraphReportRenderer:
         """Render the graph report into plain text."""
 
         title = "Django Migration Inspector Graph Check"
-        decision = "REVIEW GRAPH" if report.multiple_head_apps or report.merge_nodes else "CLEAR"
+        decision = "REVIEW GRAPH" if report.multiple_head_apps else "CLEAR"
         squashed_nodes = _find_squashed_nodes(report)
         lines = [
             title,
@@ -109,7 +109,7 @@ class TextGraphReportRenderer:
                 ),
                 (
                     f"  - {_pluralize(len(report.merge_nodes), 'merge migration')} "
-                    f"{_be_verb(len(report.merge_nodes))} present."
+                    f"{_be_verb(len(report.merge_nodes))} present as topology context."
                 ),
                 "  - "
                 f"{_pluralize(len(report.dependency_hotspots), 'dependency hotspot')} may affect "
@@ -124,19 +124,25 @@ class TextGraphReportRenderer:
             )
 
         lines.extend(["", "Graph issues:"])
-        if not report.multiple_head_apps and not report.merge_nodes:
-            lines.append("  - No multiple heads or merge migrations found in the visible scope.")
+        if not report.multiple_head_apps:
+            lines.append("  - No multiple heads found in the visible scope.")
         else:
-            if report.multiple_head_apps:
-                for app_head_group in report.multiple_head_apps:
-                    head_list = ", ".join(head.identifier for head in app_head_group.heads)
-                    lines.append(
-                        "  - "
-                        f"{app_head_group.app_label} has {len(app_head_group.heads)} heads: "
-                        f"{head_list}"
-                    )
-            if report.merge_nodes:
-                lines.extend([f"  - {merge_node.identifier}" for merge_node in report.merge_nodes])
+            for app_head_group in report.multiple_head_apps:
+                head_list = ", ".join(head.identifier for head in app_head_group.heads)
+                lines.append(
+                    "  - "
+                    f"{app_head_group.app_label} has {len(app_head_group.heads)} heads: "
+                    f"{head_list}"
+                )
+
+        lines.extend(["", "Topology notes:"])
+        if not report.merge_nodes:
+            lines.append("  - No merge migrations found in the visible scope.")
+        else:
+            lines.append(
+                "  - Merge migrations are normal after branch resolution; review them for context:"
+            )
+            lines.extend([f"    - {merge_node.identifier}" for merge_node in report.merge_nodes])
 
         lines.extend(["", "Hotspots:"])
         lines.extend(_format_hotspots(report.dependency_hotspots))
