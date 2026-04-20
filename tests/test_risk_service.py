@@ -22,7 +22,7 @@ from django_migration_inspector.domain.enums import (
 )
 from django_migration_inspector.domain.keys import MigrationNodeKey
 from django_migration_inspector.domain.plans import ForwardMigrationPlan, PlannedMigrationStep
-from django_migration_inspector.domain.reports import RiskAssessmentReport
+from django_migration_inspector.domain.reports import RiskAssessmentReport, RiskFinding
 from django_migration_inspector.renderers.risk_text import TextRiskReportRenderer
 from django_migration_inspector.services import build_default_risk_service
 
@@ -156,6 +156,7 @@ def test_management_command_renders_risk_text_for_one_app(
     assert "contains destructive schema changes" in rendered
     assert "billing.0002_remove_reference" in rendered
     assert "billing.0003_irreversible_cleanup" in rendered
+    assert "migration_inspect risk --app billing --details" in rendered
 
 
 def test_management_command_renders_historical_risk_json(
@@ -283,3 +284,41 @@ def test_text_risk_renderer_explains_empty_pending_plan() -> None:
     assert "Pending migrations: 0" in rendered
     assert "No pending migrations need review in the selected scope." in rendered
     assert "migration_inspect audit" in rendered
+
+
+def test_text_risk_renderer_preserves_scope_in_next_step() -> None:
+    migration_key = MigrationNodeKey("billing", "0002_remove_reference")
+    report = RiskAssessmentReport(
+        database_alias="replica",
+        selected_app_label="billing",
+        overall_severity=RiskSeverity.HIGH,
+        rollback_safe=False,
+        findings=(
+            RiskFinding(
+                rule_id="destructive_schema_operation",
+                kind=RiskFindingKind.DESTRUCTIVE,
+                severity=RiskSeverity.HIGH,
+                migration=migration_key,
+                operation_index=0,
+                operation_path="0",
+                operation_name="RemoveField",
+                message="Removing a field can drop stored data.",
+                recommendation="Review the field removal before deployment.",
+            ),
+        ),
+        plan=ForwardMigrationPlan(
+            database_alias="replica",
+            selected_app_label="billing",
+            scope=RiskAnalysisScope.HISTORY,
+            target_leaf_nodes=(migration_key,),
+            steps=(),
+        ),
+        offline=True,
+    )
+
+    rendered = TextRiskReportRenderer().render(report)
+
+    assert (
+        "python manage.py migration_inspect audit --database replica --app billing "
+        "--offline --details"
+    ) in rendered

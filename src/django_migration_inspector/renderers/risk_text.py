@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
 
 from django_migration_inspector.domain.enums import (
@@ -24,6 +25,19 @@ def _format_operation_reference(*, operation_index: int, operation_path: str) ->
     if operation_path == str(operation_index):
         return f"op #{operation_index}"
     return f"op {operation_path}"
+
+
+def _build_detail_command(report: RiskAssessmentReport) -> str:
+    mode = "risk" if report.analysis_scope is RiskAnalysisScope.PENDING else "audit"
+    command_parts = ["python", "manage.py", "migration_inspect", mode]
+    if report.database_alias != "default":
+        command_parts.extend(("--database", report.database_alias))
+    if report.selected_app_label is not None:
+        command_parts.extend(("--app", report.selected_app_label))
+    if report.offline and report.analysis_scope is RiskAnalysisScope.HISTORY:
+        command_parts.append("--offline")
+    command_parts.append("--details")
+    return " ".join(shlex.quote(command_part) for command_part in command_parts)
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,13 +350,7 @@ class TextRiskReportRenderer:
         return lines
 
     def _render_next_step(self, report: RiskAssessmentReport) -> list[str]:
-        command = (
-            "python manage.py migration_inspect risk --details"
-            if report.analysis_scope is RiskAnalysisScope.PENDING
-            else "python manage.py migration_inspect audit --details"
-        )
-        if report.offline and report.analysis_scope is RiskAnalysisScope.HISTORY:
-            command = "python manage.py migration_inspect audit --offline --details"
         if not report.findings:
             return []
+        command = _build_detail_command(report)
         return ["", "Next step:", f"  - Run `{command}` for the full per-operation review."]
