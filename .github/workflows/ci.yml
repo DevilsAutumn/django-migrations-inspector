@@ -7,28 +7,8 @@ on:
   pull_request:
 
 jobs:
-  quality:
+  checks:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-        django-version:
-          - "Django>=4.2,<4.3"
-          - "Django>=5.0,<5.1"
-          - "Django>=5.1,<5.2"
-          - "Django>=5.2,<5.3"
-        include:
-          - python-version: "3.12"
-            django-version: "Django>=6.0,<6.1"
-          - python-version: "3.13"
-            django-version: "Django>=5.2,<5.3"
-          - python-version: "3.13"
-            django-version: "Django>=6.0,<6.1"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,12 +16,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.13"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[dev,docs]' '${{ matrix.django-version }}'
+          python -m pip install -e '.[dev,docs,release]' 'Django>=6.0,<6.1'
 
       - name: Check formatting
         run: ruff format --check .
@@ -52,8 +33,72 @@ jobs:
       - name: Type check
         run: mypy src tests
 
-      - name: Run tests
-        run: pytest -q
-
       - name: Build docs
         run: mkdocs build --strict
+
+      - name: Build package distributions
+        run: python -m build
+
+      - name: Check package metadata
+        run: python -m twine check dist/*
+
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            django-version: "Django>=4.2,<4.3"
+          - python-version: "3.11"
+            django-version: "Django>=4.2,<4.3"
+          - python-version: "3.12"
+            django-version: "Django>=4.2,<4.3"
+          - python-version: "3.10"
+            django-version: "Django>=5.0,<5.1"
+          - python-version: "3.11"
+            django-version: "Django>=5.0,<5.1"
+          - python-version: "3.12"
+            django-version: "Django>=5.0,<5.1"
+          - python-version: "3.10"
+            django-version: "Django>=5.1,<5.2"
+          - python-version: "3.11"
+            django-version: "Django>=5.1,<5.2"
+          - python-version: "3.12"
+            django-version: "Django>=5.1,<5.2"
+          - python-version: "3.13"
+            django-version: "Django>=5.1,<5.2"
+          - python-version: "3.10"
+            django-version: "Django>=5.2,<5.3"
+          - python-version: "3.11"
+            django-version: "Django>=5.2,<5.3"
+          - python-version: "3.12"
+            django-version: "Django>=5.2,<5.3"
+          - python-version: "3.13"
+            django-version: "Django>=5.2,<5.3"
+          - python-version: "3.14"
+            django-version: "Django>=5.2,<5.3"
+          - python-version: "3.12"
+            django-version: "Django>=6.0,<6.1"
+          - python-version: "3.13"
+            django-version: "Django>=6.0,<6.1"
+          - python-version: "3.14"
+            django-version: "Django>=6.0,<6.1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]' '${{ matrix.django-version }}'
+
+      - name: Run tests
+        run: pytest -q
