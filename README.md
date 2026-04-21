@@ -1,6 +1,21 @@
-# Django Migration Inspector (Experimental)
+# Django Migrations Inspector
 
-`django-migration-inspector` is an open source migration safety toolkit for Django.
+`django-migrations-inspector` is an open source migration safety toolkit for Django.
+
+Install the package from PyPI with:
+
+```bash
+python -m pip install django-migrations-inspector
+```
+
+Then add the Django app to `INSTALLED_APPS` with:
+
+```python
+INSTALLED_APPS = [
+    # ...
+    "django_migration_inspector",
+]
+```
 
 It is designed around four practical Django questions:
 
@@ -56,7 +71,6 @@ python manage.py migration_inspect --app analytics
 Replace `billing`, `inventory`, `catalog`, and `analytics` with app labels from your own Django project.
 
 To expose the management command, add `"django_migration_inspector"` to `INSTALLED_APPS`.
-
 For hosted project documentation, this repository includes an MkDocs site that can be published on
 GitHub Pages or Read the Docs.
 

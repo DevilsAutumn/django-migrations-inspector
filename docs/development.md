@@ -28,6 +28,26 @@ mkdocs build --strict
 The repository also includes a GitHub Actions workflow at `.github/workflows/ci.yml` that
 enforces the same checks on pushes and pull requests.
 
+## Release workflow
+
+Build and validate release artifacts locally with:
+
+```bash
+python -m pip install -e '.[release]'
+python -m build
+python -m twine check dist/*
+```
+
+The repository also includes `.github/workflows/release.yml` for Trusted Publishing.
+
+Recommended release flow:
+
+1. Update `version` in `pyproject.toml` and `src/django_migration_inspector/__about__.py`.
+2. Run the local release checks.
+3. Trigger the `release` workflow with `testpypi` selected.
+4. Configure GitHub environments named `testpypi` and `pypi` as Trusted Publishers in TestPyPI and PyPI.
+5. Push a version tag such as `v0.1.0` to publish to PyPI.
+
 ## Documentation workflow
 
 Install docs dependencies and build locally:

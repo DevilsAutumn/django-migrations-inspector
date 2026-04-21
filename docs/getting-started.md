@@ -9,19 +9,19 @@ The package currently targets:
 
 ## Installation
 
-Add the package to your Django project and include the app in `INSTALLED_APPS`:
+Install the package from PyPI:
+
+```bash
+python -m pip install django-migrations-inspector
+```
+
+Then include the Django app in `INSTALLED_APPS`:
 
 ```python
 INSTALLED_APPS = [
     # ...
     "django_migration_inspector",
 ]
-```
-
-Install from a local checkout:
-
-```bash
-python -m pip install -e .
 ```
 
 For development:

@@ -1,4 +1,4 @@
-site_name: Django Migration Inspector
+site_name: Django Migrations Inspector
 site_description: migration safety toolkit for Django.
 docs_dir: docs
 site_dir: site
