@@ -1,6 +1,6 @@
-# Django Migration Inspector
+# Django Migrations Inspector
 
-Django Migration Inspector is an open-source migration safety toolkit for Django teams.
+Django Migrations Inspector is an open-source migration safety toolkit for Django teams.
 
 It helps answer the questions that usually show up too late:
 

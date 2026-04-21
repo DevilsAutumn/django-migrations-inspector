@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "django-migration-inspector"
+name = "django-migrations-inspector"
 version = "0.1.0"
 description = "migration safety toolkit for Django."
 readme = "README.md"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["django", "migrations", "database", "devtools", "schema"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Framework :: Django",
   "Framework :: Django :: 4.2",
   "Framework :: Django :: 5.0",
@@ -49,11 +49,16 @@ dev = [
 docs = [
   "mkdocs>=1.6.1",
 ]
+release = [
+  "build>=1.2.2",
+  "twine>=5.1.1",
+]
 
 [project.urls]
-Homepage = "https://github.com/DevilsAutumn/django-migration-inspector"
-Repository = "https://github.com/DevilsAutumn/django-migration-inspector"
-Documentation = "https://devilsautumn.github.io/django-migration-inspector/"
+Homepage = "https://github.com/DevilsAutumn/django-migrations-inspector"
+Repository = "https://github.com/DevilsAutumn/django-migrations-inspector"
+Documentation = "https://devilsautumn.github.io/django-migrations-inspector/"
+Issues = "https://github.com/DevilsAutumn/django-migrations-inspector/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/django_migration_inspector"]
