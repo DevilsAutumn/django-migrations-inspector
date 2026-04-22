@@ -1,5 +1,13 @@
 # Django Migrations Inspector
 
+[![PyPI version](https://img.shields.io/pypi/v/django-migrations-inspector.svg)](https://pypi.org/project/django-migrations-inspector/)
+[![Python versions](https://img.shields.io/pypi/pyversions/django-migrations-inspector.svg)](https://pypi.org/project/django-migrations-inspector/)
+[![Django support](https://img.shields.io/badge/Django-4.2%20--%206.0-0C4B33.svg)](https://github.com/DevilsAutumn/django-migrations-inspector/blob/main/docs/getting-started.md)
+[![CI](https://github.com/DevilsAutumn/django-migrations-inspector/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DevilsAutumn/django-migrations-inspector/actions/workflows/ci.yml)
+[![Docs](https://github.com/DevilsAutumn/django-migrations-inspector/actions/workflows/docs.yml/badge.svg?branch=main)](https://devilsautumn.github.io/django-migrations-inspector/)
+[![License](https://img.shields.io/github/license/DevilsAutumn/django-migrations-inspector.svg)](LICENSE)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/django-migrations-inspector?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/django-migrations-inspector)
+
 `django-migrations-inspector` is an open source migration safety toolkit for Django.
 
 Install the package from PyPI with:
