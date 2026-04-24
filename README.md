@@ -79,6 +79,16 @@ python manage.py migration_inspect --app analytics
 Replace `billing`, `inventory`, `catalog`, and `analytics` with app labels from your own Django project.
 
 To expose the management command, add `"django_migration_inspector"` to `INSTALLED_APPS`.
+
+CI policy gates:
+
+```bash
+python manage.py migration_inspect --fail-on-multiple-heads
+python manage.py migration_inspect risk --fail-on-severity high
+```
+
+`risk --fail-on-severity high` is a good deploy gate because it checks the pending plan, not old migration history. Use strict `audit --offline --fail-on-severity high` when you want a full repository audit, or once existing migration debt has been reviewed.
+
 For hosted project documentation, this repository includes an MkDocs site that can be published on
 GitHub Pages or Read the Docs.
 

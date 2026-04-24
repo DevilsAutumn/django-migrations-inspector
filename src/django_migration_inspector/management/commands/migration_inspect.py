@@ -24,7 +24,8 @@ from django.db.utils import DatabaseError as DjangoDatabaseError
 from django.utils.connection import ConnectionDoesNotExist
 
 from django_migration_inspector.config import InspectConfig, RiskConfig, RollbackConfig
-from django_migration_inspector.domain.enums import OutputFormat, RiskAnalysisScope
+from django_migration_inspector.domain.enums import OutputFormat, RiskAnalysisScope, RiskSeverity
+from django_migration_inspector.domain.reports import GraphInspectionReport
 from django_migration_inspector.exceptions import DjangoMigrationInspectorError
 from django_migration_inspector.renderers import (
     GraphTextRenderOptions,
@@ -41,6 +42,18 @@ from django_migration_inspector.services import (
 )
 
 SIMPLE_MODES = ("inspect", "risk", "audit", "rollback")
+FAIL_ON_SEVERITY_CHOICES = (
+    RiskSeverity.MEDIUM.value,
+    RiskSeverity.HIGH.value,
+    RiskSeverity.CRITICAL.value,
+)
+SEVERITY_RANK = {
+    RiskSeverity.NONE: 0,
+    RiskSeverity.LOW: 1,
+    RiskSeverity.MEDIUM: 2,
+    RiskSeverity.HIGH: 3,
+    RiskSeverity.CRITICAL: 4,
+}
 MIGRATION_GRAPH_ERRORS = (
     AmbiguityError,
     BadMigrationError,
@@ -126,6 +139,17 @@ class Command(BaseCommand):
             default=None,
             help="For rollback text output, explain why the selected app is included.",
         )
+        parser.add_argument(
+            "--fail-on-severity",
+            choices=FAIL_ON_SEVERITY_CHOICES,
+            default=None,
+            help=("Exit non-zero when risk, audit, or rollback severity meets this threshold."),
+        )
+        parser.add_argument(
+            "--fail-on-multiple-heads",
+            action="store_true",
+            help="Exit non-zero when inspect mode finds multiple heads in any app.",
+        )
 
     def handle(self, *args: object, **options: object) -> str | None:
         del args
@@ -150,6 +174,8 @@ class Command(BaseCommand):
             details = bool(options["details"])
             show_operations = bool(options["show_operations"])
             why_app = self._normalize_optional_string(options["why_app"])
+            fail_on_severity = self._resolve_fail_on_severity(options["fail_on_severity"])
+            fail_on_multiple_heads = bool(options["fail_on_multiple_heads"])
 
             self._validate_mode_specific_options(
                 output_format=output_format,
@@ -158,6 +184,8 @@ class Command(BaseCommand):
                 show_operations=show_operations,
                 why_app=why_app,
                 offline=offline,
+                fail_on_severity=fail_on_severity,
+                fail_on_multiple_heads=fail_on_multiple_heads,
             )
 
             if requested_mode in {"risk", "audit"}:
@@ -186,6 +214,10 @@ class Command(BaseCommand):
                     rendered_output=risk_renderer.render(risk_report),
                     output_format=output_format,
                     output_path=output_path,
+                )
+                self._raise_for_severity_policy(
+                    overall_severity=risk_report.overall_severity,
+                    fail_on_severity=fail_on_severity,
                 )
             elif requested_mode == "rollback":
                 if app_label is not None:
@@ -222,6 +254,10 @@ class Command(BaseCommand):
                     output_format=output_format,
                     output_path=output_path,
                 )
+                self._raise_for_severity_policy(
+                    overall_severity=rollback_report.overall_severity,
+                    fail_on_severity=fail_on_severity,
+                )
             else:
                 inspect_config = InspectConfig(
                     output_format=output_format,
@@ -239,6 +275,10 @@ class Command(BaseCommand):
                     rendered_output=graph_renderer.render(graph_report),
                     output_format=output_format,
                     output_path=output_path,
+                )
+                self._raise_for_multiple_heads_policy(
+                    graph_report=graph_report,
+                    fail_on_multiple_heads=fail_on_multiple_heads,
                 )
         except DjangoMigrationInspectorError as error:
             raise CommandError(str(error)) from error
@@ -319,6 +359,12 @@ class Command(BaseCommand):
 
         raise CommandError("Unable to determine the requested command mode.")
 
+    def _resolve_fail_on_severity(self, raw_value: object) -> RiskSeverity | None:
+        value = self._normalize_optional_string(raw_value)
+        if value is None:
+            return None
+        return RiskSeverity(value)
+
     def _validate_mode_specific_options(
         self,
         *,
@@ -328,6 +374,8 @@ class Command(BaseCommand):
         show_operations: bool,
         why_app: str | None,
         offline: bool,
+        fail_on_severity: RiskSeverity | None,
+        fail_on_multiple_heads: bool,
     ) -> None:
         if requested_mode == "rollback":
             if offline:
@@ -340,6 +388,8 @@ class Command(BaseCommand):
                     "--details, --show-operations, and --why-app are available only for "
                     "text rollback output."
                 )
+            if fail_on_multiple_heads:
+                raise CommandError("--fail-on-multiple-heads is available only for inspect mode.")
             return
 
         if requested_mode == "risk" and offline:
@@ -356,6 +406,12 @@ class Command(BaseCommand):
                 )
             if output_format is not OutputFormat.TEXT and details:
                 raise CommandError("--details is available only for text output.")
+            if requested_mode == "inspect" and fail_on_severity is not None:
+                raise CommandError(
+                    "--fail-on-severity is available only for risk, audit, and rollback modes."
+                )
+            if requested_mode in {"risk", "audit"} and fail_on_multiple_heads:
+                raise CommandError("--fail-on-multiple-heads is available only for inspect mode.")
             return
 
         if details or show_operations or why_app is not None:
@@ -363,6 +419,37 @@ class Command(BaseCommand):
                 "--details, --show-operations, and --why-app can only be used with "
                 "inspect, risk, audit, or rollback mode."
             )
+
+    def _raise_for_severity_policy(
+        self,
+        *,
+        overall_severity: RiskSeverity,
+        fail_on_severity: RiskSeverity | None,
+    ) -> None:
+        if fail_on_severity is None:
+            return
+        if SEVERITY_RANK[overall_severity] < SEVERITY_RANK[fail_on_severity]:
+            return
+        raise CommandError(
+            "Migration inspection policy failed: "
+            f"overall severity is {overall_severity.value}, threshold is {fail_on_severity.value}."
+        )
+
+    def _raise_for_multiple_heads_policy(
+        self,
+        *,
+        graph_report: GraphInspectionReport,
+        fail_on_multiple_heads: bool,
+    ) -> None:
+        if not fail_on_multiple_heads or not graph_report.multiple_head_apps:
+            return
+
+        app_labels = ", ".join(
+            app_head_group.app_label for app_head_group in graph_report.multiple_head_apps
+        )
+        raise CommandError(
+            f"Migration inspection policy failed: multiple migration heads found in {app_labels}."
+        )
 
     def _emit_rendered_output(
         self,

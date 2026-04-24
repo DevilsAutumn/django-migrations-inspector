@@ -107,6 +107,28 @@ python manage.py migration_inspect rollback inventory zero --output rollback-sum
 python manage.py migration_inspect rollback inventory zero --json --output rollback.json
 ```
 
+#### CI policy gates
+
+Policy flags render the normal report, then exit non-zero if the configured condition is met.
+
+```bash
+python manage.py migration_inspect --fail-on-multiple-heads
+python manage.py migration_inspect risk --fail-on-severity high
+python manage.py migration_inspect rollback billing 0001_initial --fail-on-severity high
+```
+
+`--fail-on-multiple-heads` is available for graph inspection.
+
+`--fail-on-severity` is available for `risk`, `audit`, and `rollback`. Supported thresholds are:
+
+1. `medium`
+2. `high`
+3. `critical`
+
+For most teams, `high` is the useful threshold. It blocks data loss, rollback safety, and production-impact concerns without failing every migration that simply needs review.
+
+`risk --fail-on-severity high` is the safest default deploy gate because it checks the pending plan. `audit --offline --fail-on-severity high` is stricter: it scans migration history, so existing projects should use it as a full audit until baseline support can separate accepted old findings from new risk.
+
 #### `risk`
 
 Analyze the pending forward migration plan rather than rendering the graph summary:
