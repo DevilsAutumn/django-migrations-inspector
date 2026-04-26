@@ -58,6 +58,49 @@ def test_management_command_renders_risk_json(django_db_blocker: DjangoDbBlocker
     assert any(finding["operation_name"] == "RunPython" for finding in report["findings"])
 
 
+def test_management_command_fails_on_risk_severity_after_rendering_json(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        try:
+            call_command(
+                "migration_inspect",
+                "risk",
+                "--json",
+                "--fail-on-severity",
+                "high",
+                stdout=output,
+            )
+        except CommandError as error:
+            error_message = str(error)
+        else:
+            raise AssertionError("Expected risk severity policy to fail.")
+
+    report = json.loads(output.getvalue())
+    assert report["overall_severity"] == "high"
+    assert "overall severity is high, threshold is high" in error_message
+
+
+def test_management_command_allows_risk_below_severity_policy(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        call_command(
+            "migration_inspect",
+            "risk",
+            "--json",
+            "--fail-on-severity",
+            "critical",
+            stdout=output,
+        )
+
+    assert json.loads(output.getvalue())["overall_severity"] == "high"
+
+
 def test_management_command_supports_risk_subcommand(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:
@@ -83,6 +126,27 @@ def test_management_command_supports_audit_subcommand_json(
     report = json.loads(output.getvalue())
     assert report["report_type"] == "risk_assessment"
     assert report["analysis_scope"] == "history"
+
+
+def test_management_command_fails_on_offline_audit_severity_policy() -> None:
+    output = StringIO()
+
+    try:
+        call_command(
+            "migration_inspect",
+            "audit",
+            "--offline",
+            "--fail-on-severity",
+            "high",
+            stdout=output,
+        )
+    except CommandError as error:
+        error_message = str(error)
+    else:
+        raise AssertionError("Expected audit severity policy to fail.")
+
+    assert "Decision: IRREVERSIBLE FOUND" in output.getvalue()
+    assert "overall severity is high, threshold is high" in error_message
 
 
 def test_management_command_renders_audit_text_with_file_review_language(
@@ -200,6 +264,28 @@ def test_management_command_rejects_visual_risk_format(
             assert "supports only text and json" in str(error)
         else:
             raise AssertionError("Expected risk mode with Mermaid output to fail.")
+
+
+def test_management_command_rejects_multiple_heads_policy_for_risk() -> None:
+    output = StringIO()
+
+    try:
+        call_command("migration_inspect", "risk", "--fail-on-multiple-heads", stdout=output)
+    except CommandError as error:
+        assert "--fail-on-multiple-heads is available only for inspect mode" in str(error)
+    else:
+        raise AssertionError("Expected risk multiple-head policy to fail.")
+
+
+def test_management_command_rejects_low_severity_policy() -> None:
+    output = StringIO()
+
+    try:
+        call_command("migration_inspect", "risk", "--fail-on-severity", "low", stdout=output)
+    except CommandError as error:
+        assert "invalid choice: 'low'" in str(error)
+    else:
+        raise AssertionError("Expected low severity policy to fail.")
 
 
 def test_management_command_rejects_legacy_risk_flag(

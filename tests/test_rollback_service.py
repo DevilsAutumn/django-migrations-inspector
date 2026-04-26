@@ -205,6 +205,65 @@ def test_management_command_renders_rollback_json(
     assert any(blocker["operation_name"] == "RunPython" for blocker in report["blockers"])
 
 
+def test_management_command_fails_on_rollback_severity_after_rendering_json(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        try:
+            call_command(
+                "migration_inspect",
+                "rollback",
+                "inventory",
+                "zero",
+                "--json",
+                "--fail-on-severity",
+                "high",
+                stdout=output,
+            )
+        except CommandError as error:
+            error_message = str(error)
+        else:
+            raise AssertionError("Expected rollback severity policy to fail.")
+
+    report = json.loads(output.getvalue())
+    assert report["overall_severity"] == "high"
+    assert "overall severity is high, threshold is high" in error_message
+
+
+def test_management_command_allows_rollback_below_severity_policy(
+    django_db_blocker: DjangoDbBlocker,
+) -> None:
+    output = StringIO()
+
+    with django_db_blocker.unblock():
+        _set_applied_migrations(
+            ("inventory", "0001_initial"),
+            ("inventory", "0002_add_sku"),
+            ("inventory", "0002_add_status"),
+            ("inventory", "0003_merge_0002_add_sku_0002_add_status"),
+        )
+        call_command(
+            "migration_inspect",
+            "rollback",
+            "inventory",
+            "zero",
+            "--json",
+            "--fail-on-severity",
+            "critical",
+            stdout=output,
+        )
+
+    assert json.loads(output.getvalue())["overall_severity"] == "high"
+
+
 def test_management_command_supports_rollback_subcommand(
     django_db_blocker: DjangoDbBlocker,
 ) -> None:

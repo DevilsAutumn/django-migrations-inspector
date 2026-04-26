@@ -123,6 +123,15 @@ JSON output is designed for CI and tooling:
 python manage.py migration_inspect --json
 ```
 
+For build gates, use policy flags:
+
+```bash
+python manage.py migration_inspect --fail-on-multiple-heads
+python manage.py migration_inspect risk --fail-on-severity high
+```
+
+Use `risk --fail-on-severity high` as the practical deploy gate. It checks pending migrations against the current database state. Use `audit --offline --fail-on-severity high` for full repository audits, or after existing migration debt has been accepted or cleaned up.
+
 ## Visual output
 
 To render the visible migration graph:
