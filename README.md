@@ -85,18 +85,19 @@ GitHub Pages or Read the Docs.
 Local docs commands:
 
 ```bash
-python -m pip install '.[docs]'
-mkdocs serve
-mkdocs build --strict
+python -m pip install uv
+uv sync --python 3.12 --no-default-groups --group docs
+uv run mkdocs serve
+uv run mkdocs build --strict
 ```
 
 Local quality commands:
 
 ```bash
-python -m pip install -e '.[dev,docs]'
-ruff format .
-ruff format --check .
-ruff check .
-mypy src tests
-pytest -q
+uv sync --python 3.12 --all-groups
+uv run ruff format .
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src tests
+uv run pytest -q
 ```

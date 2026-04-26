@@ -27,7 +27,8 @@ INSTALLED_APPS = [
 For development:
 
 ```bash
-python -m pip install -e '.[dev,docs]'
+python -m pip install uv
+uv sync --python 3.12 --all-groups
 ```
 
 ## First command

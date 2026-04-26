@@ -39,6 +39,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+  "mkdocs>=1.6.1",
+]
+
+[dependency-groups]
 dev = [
   "coverage[toml]>=7.6.0",
   "django-stubs[compatible-mypy]>=5.1.0",
@@ -54,6 +59,9 @@ release = [
   "build>=1.2.2",
   "twine>=5.1.1",
 ]
+
+[tool.uv]
+required-version = ">=0.7.8"
 
 [project.urls]
 Homepage = "https://github.com/DevilsAutumn/django-migrations-inspector"
