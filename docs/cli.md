@@ -166,6 +166,8 @@ The default text output is summary-first:
 4. Top historical migrations that deserve review
 
 Use `--details` for the full finding list.
+Detailed text output keeps evidence and advice separate: findings list the exact migration
+operations, while guidance prints repeated recommendations once with a count.
 
 Use `audit --offline` when you want a file-only review of a project whose database is not set up.
 Like `risk`, audit also inspects nested `SeparateDatabaseAndState` operations so manual database
@@ -196,6 +198,7 @@ Rollback targets accept unique prefixes within the selected app, so `0001` can r
 It does not currently support `mermaid` or `dot`.
 
 Text rollback output is summary-first by default, so large rollback plans do not flood the terminal.
+When blockers or concerns exist, repeated recovery advice is grouped once under `Guidance`.
 Use the following flags to expand detail only when you need it:
 
 Rollback cannot run with `--offline` because the reverse plan depends on applied migrations in the
@@ -211,6 +214,10 @@ python manage.py migration_inspect risk --details
 python manage.py migration_inspect audit --details
 python manage.py migration_inspect rollback inventory zero --details
 ```
+
+Risk and audit details group exact findings by operation type, then print deduplicated guidance.
+Rollback details include the step list and concern list, then group repeated recovery advice under
+guidance. JSON output keeps recommendations on each finding or concern for tooling.
 
 #### `--show-operations`
 

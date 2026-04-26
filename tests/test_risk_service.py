@@ -23,7 +23,10 @@ from django_migration_inspector.domain.enums import (
 from django_migration_inspector.domain.keys import MigrationNodeKey
 from django_migration_inspector.domain.plans import ForwardMigrationPlan, PlannedMigrationStep
 from django_migration_inspector.domain.reports import RiskAssessmentReport, RiskFinding
-from django_migration_inspector.renderers.risk_text import TextRiskReportRenderer
+from django_migration_inspector.renderers.risk_text import (
+    RiskTextRenderOptions,
+    TextRiskReportRenderer,
+)
 from django_migration_inspector.services import build_default_risk_service
 
 
@@ -322,3 +325,55 @@ def test_text_risk_renderer_preserves_scope_in_next_step() -> None:
         "python manage.py migration_inspect audit --database replica --app billing "
         "--offline --details"
     ) in rendered
+
+
+def test_text_risk_renderer_deduplicates_guidance_in_detailed_output() -> None:
+    first_migration = MigrationNodeKey("billing", "0002_remove_reference")
+    second_migration = MigrationNodeKey("billing", "0003_remove_legacy_code")
+    recommendation = "Confirm the field data is disposable or backed up before deployment."
+    report = RiskAssessmentReport(
+        database_alias="default",
+        selected_app_label="billing",
+        overall_severity=RiskSeverity.HIGH,
+        rollback_safe=True,
+        findings=(
+            RiskFinding(
+                rule_id="destructive_schema_operation",
+                kind=RiskFindingKind.DESTRUCTIVE,
+                severity=RiskSeverity.HIGH,
+                migration=first_migration,
+                operation_index=0,
+                operation_path="0",
+                operation_name="RemoveField",
+                message="Removing a field can drop stored data.",
+                recommendation=recommendation,
+            ),
+            RiskFinding(
+                rule_id="destructive_schema_operation",
+                kind=RiskFindingKind.DESTRUCTIVE,
+                severity=RiskSeverity.HIGH,
+                migration=second_migration,
+                operation_index=1,
+                operation_path="1",
+                operation_name="RemoveField",
+                message="Removing a field can drop stored data.",
+                recommendation=recommendation,
+            ),
+        ),
+        plan=ForwardMigrationPlan(
+            database_alias="default",
+            selected_app_label="billing",
+            scope=RiskAnalysisScope.PENDING,
+            target_leaf_nodes=(second_migration,),
+            steps=(),
+        ),
+    )
+
+    rendered = TextRiskReportRenderer(RiskTextRenderOptions(details=True)).render(report)
+
+    assert "Detailed findings:" in rendered
+    assert "  RemoveField:" in rendered
+    assert "Guidance:" in rendered
+    assert "Recommendation:" not in rendered
+    assert "(2 findings)" in rendered
+    assert rendered.count(recommendation) == 1
