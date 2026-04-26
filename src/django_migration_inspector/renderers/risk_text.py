@@ -12,7 +12,7 @@ from django_migration_inspector.domain.enums import (
     RiskSeverity,
 )
 from django_migration_inspector.domain.keys import MigrationNodeKey
-from django_migration_inspector.domain.reports import RiskAssessmentReport
+from django_migration_inspector.domain.reports import RiskAssessmentReport, RiskFinding
 
 
 def _pluralize(count: int, singular: str, plural: str | None = None) -> str:
@@ -67,6 +67,14 @@ class _RiskMigrationSummary:
     review_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class _GuidanceSummary:
+    label: str
+    recommendation: str
+    finding_count: int
+    highest_severity: RiskSeverity
+
+
 @dataclass(slots=True)
 class TextRiskReportRenderer:
     """Render risk reports for local CLI usage."""
@@ -109,6 +117,7 @@ class TextRiskReportRenderer:
 
         if self.options.details:
             lines.extend(self._render_detailed_findings(report))
+            lines.extend(self._render_guidance(report))
         else:
             lines.extend(self._render_next_step(report))
 
@@ -331,23 +340,88 @@ class TextRiskReportRenderer:
             lines.append("  - none")
             return lines
 
-        for finding in report.findings:
-            operation_reference = _format_operation_reference(
-                operation_index=finding.operation_index,
-                operation_path=finding.operation_path,
-            )
-            lines.extend(
-                [
-                    (
-                        "  - "
-                        f"[{finding.kind.value.upper()}] {finding.migration.identifier} "
-                        f"({operation_reference}: {finding.operation_name})"
-                    ),
-                    f"    {finding.message}",
-                    f"    Recommendation: {finding.recommendation}",
-                ]
+        for operation_name, findings in self._group_findings_by_operation(report.findings):
+            lines.append(f"  {operation_name}:")
+            for finding in findings:
+                operation_reference = _format_operation_reference(
+                    operation_index=finding.operation_index,
+                    operation_path=finding.operation_path,
+                )
+                lines.extend(
+                    [
+                        (
+                            "    - "
+                            f"[{finding.kind.value.upper()}/{finding.severity.value.upper()}] "
+                            f"{finding.migration.identifier} ({operation_reference})"
+                        ),
+                        f"      {finding.message}",
+                    ]
+                )
+        return lines
+
+    def _group_findings_by_operation(
+        self,
+        findings: tuple[RiskFinding, ...],
+    ) -> tuple[tuple[str, tuple[RiskFinding, ...]], ...]:
+        grouped: dict[str, list[RiskFinding]] = {}
+        for finding in findings:
+            grouped.setdefault(finding.operation_name, []).append(finding)
+        return tuple((operation_name, tuple(items)) for operation_name, items in grouped.items())
+
+    def _render_guidance(self, report: RiskAssessmentReport) -> list[str]:
+        summaries = self._build_guidance_summaries(report.findings)
+        if not summaries:
+            return []
+
+        lines = ["", "Guidance:"]
+        for summary in summaries:
+            lines.append(
+                "  - "
+                f"[{summary.highest_severity.value.upper()}] {summary.label} "
+                f"({_pluralize(summary.finding_count, 'finding')}): {summary.recommendation}"
             )
         return lines
+
+    def _build_guidance_summaries(
+        self,
+        findings: tuple[RiskFinding, ...],
+    ) -> tuple[_GuidanceSummary, ...]:
+        grouped: dict[str, list[RiskFinding]] = {}
+        for finding in findings:
+            grouped.setdefault(finding.recommendation, []).append(finding)
+
+        summaries: list[_GuidanceSummary] = []
+        for recommendation, matching_findings in grouped.items():
+            operation_names = self._unique_operation_names(matching_findings)
+            highest_severity = max(
+                (finding.severity for finding in matching_findings),
+                key=self._severity_rank,
+            )
+            summaries.append(
+                _GuidanceSummary(
+                    label=", ".join(operation_names),
+                    recommendation=recommendation,
+                    finding_count=len(matching_findings),
+                    highest_severity=highest_severity,
+                )
+            )
+        return tuple(
+            sorted(
+                summaries,
+                key=lambda summary: (
+                    -self._severity_rank(summary.highest_severity),
+                    summary.label,
+                    summary.recommendation,
+                ),
+            )
+        )
+
+    def _unique_operation_names(self, findings: list[RiskFinding]) -> tuple[str, ...]:
+        operation_names: list[str] = []
+        for finding in findings:
+            if finding.operation_name not in operation_names:
+                operation_names.append(finding.operation_name)
+        return tuple(operation_names)
 
     def _render_next_step(self, report: RiskAssessmentReport) -> list[str]:
         if not report.findings:

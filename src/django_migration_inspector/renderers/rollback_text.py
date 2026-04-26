@@ -10,6 +10,7 @@ from django_migration_inspector.domain.enums import RiskSeverity
 from django_migration_inspector.domain.keys import MigrationNodeKey
 from django_migration_inspector.domain.reports import (
     RollbackBlocker,
+    RollbackConcern,
     RollbackSimulationReport,
 )
 
@@ -73,6 +74,15 @@ class _MigrationRiskSummary:
     high_or_worse_concern_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class _GuidanceSummary:
+    label: str
+    recommendation: str
+    item_count: int
+    highest_severity: RiskSeverity
+    noun: str
+
+
 @dataclass(slots=True)
 class TextRollbackReportRenderer:
     """Render rollback simulation reports for local CLI usage."""
@@ -105,7 +115,9 @@ class TextRollbackReportRenderer:
         if self.options.details:
             lines.extend(self._render_step_details(report))
             lines.extend(self._render_full_concerns(report))
+            lines.extend(self._render_guidance(report))
         else:
+            lines.extend(self._render_guidance(report))
             lines.extend(self._render_next_step(report))
 
         return "\n".join(lines) + "\n"
@@ -207,7 +219,6 @@ class TextRollbackReportRenderer:
                 f"({operation_reference}: {blocker.operation_name})"
             ),
             f"    {blocker.message}",
-            f"    Recommendation: {blocker.recommendation}",
         ]
 
     def _render_inclusion_reasons(self, report: RollbackSimulationReport) -> list[str]:
@@ -560,28 +571,114 @@ class TextRollbackReportRenderer:
             lines.append("  - none")
             return lines
 
-        for concern in report.concerns:
-            operation_reference = _format_operation_reference(
-                operation_index=concern.operation_index,
-                operation_path=concern.operation_path,
-            )
-            operation_label = (
-                f" ({operation_reference}: {concern.operation_name})"
-                if operation_reference is not None and concern.operation_name is not None
-                else ""
-            )
-            lines.extend(
-                [
-                    (
-                        "  - "
-                        f"[{concern.severity.value.upper()}] "
-                        f"{concern.migration.identifier}{operation_label}"
-                    ),
-                    f"    {concern.message}",
-                    f"    Recommendation: {concern.recommendation}",
-                ]
+        for label, concerns in self._group_concerns(report.concerns):
+            lines.append(f"  {label}:")
+            for concern in concerns:
+                operation_reference = _format_operation_reference(
+                    operation_index=concern.operation_index,
+                    operation_path=concern.operation_path,
+                )
+                operation_label = (
+                    f" ({operation_reference}: {concern.operation_name})"
+                    if operation_reference is not None and concern.operation_name is not None
+                    else ""
+                )
+                lines.extend(
+                    [
+                        (
+                            "    - "
+                            f"[{concern.severity.value.upper()}] "
+                            f"{concern.migration.identifier}{operation_label}"
+                        ),
+                        f"      {concern.message}",
+                    ]
+                )
+        return lines
+
+    def _group_concerns(
+        self,
+        concerns: tuple[RollbackConcern, ...],
+    ) -> tuple[tuple[str, tuple[RollbackConcern, ...]], ...]:
+        grouped: dict[str, list[RollbackConcern]] = {}
+        for concern in concerns:
+            grouped.setdefault(self._format_concern_label(concern), []).append(concern)
+        return tuple((label, tuple(items)) for label, items in grouped.items())
+
+    def _render_guidance(self, report: RollbackSimulationReport) -> list[str]:
+        summaries = self._build_guidance_summaries(report)
+        if not summaries:
+            return []
+
+        lines = ["", "Guidance:"]
+        for summary in summaries:
+            lines.append(
+                "  - "
+                f"[{summary.highest_severity.value.upper()}] {summary.label} "
+                f"({_pluralize(summary.item_count, summary.noun)}): {summary.recommendation}"
             )
         return lines
+
+    def _build_guidance_summaries(
+        self,
+        report: RollbackSimulationReport,
+    ) -> tuple[_GuidanceSummary, ...]:
+        grouped: dict[tuple[str, str, str, RiskSeverity], int] = {}
+
+        for blocker in report.blockers:
+            key = (
+                "Irreversible reverse step",
+                blocker.recommendation,
+                "blocker",
+                RiskSeverity.CRITICAL,
+            )
+            grouped[key] = grouped.get(key, 0) + 1
+
+        for concern in report.concerns:
+            key = (
+                self._format_concern_label(concern),
+                concern.recommendation,
+                "concern",
+                concern.severity,
+            )
+            grouped[key] = grouped.get(key, 0) + 1
+
+        summaries = tuple(
+            _GuidanceSummary(
+                label=label,
+                recommendation=recommendation,
+                item_count=item_count,
+                highest_severity=severity,
+                noun=noun,
+            )
+            for (label, recommendation, noun, severity), item_count in grouped.items()
+        )
+        return tuple(
+            sorted(
+                summaries,
+                key=lambda summary: (
+                    -_severity_rank(summary.highest_severity),
+                    summary.label,
+                    summary.recommendation,
+                ),
+            )
+        )
+
+    def _format_concern_label(self, concern: RollbackConcern) -> str:
+        labels = {
+            "cross_app_impact": "Cross-app impact",
+            "data_loss_reversal": "Data-loss reversal",
+            "merge_topology": "Merge topology",
+            "reverse_data_migration": "Reverse data migration",
+            "reverse_sql": "Reverse SQL",
+            "rollback_drops_table": "Rollback drops table",
+            "rollback_removes_field": "Rollback removes field",
+            "table_restore": "Table restore",
+        }
+        if concern.category in labels:
+            return labels[concern.category]
+        if concern.operation_name is not None:
+            return concern.operation_name
+        return concern.category.replace("_", " ").capitalize()
 
     def _render_next_step(self, report: RollbackSimulationReport) -> list[str]:
         target_app_label = report.plan.target_app_label

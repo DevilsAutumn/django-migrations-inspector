@@ -304,6 +304,8 @@ def test_management_command_renders_verbose_rollback_text(
     assert "inventory.0003_merge_0002_add_sku_0002_add_status (0 operations, merge)" in rendered
     assert "catalog.0001_initial (1 operation)" in rendered
     assert "All concerns:" in rendered
+    assert "Guidance:" in rendered
+    assert "Recommendation:" not in rendered
 
 
 def test_management_command_renders_rollback_operations_when_requested(

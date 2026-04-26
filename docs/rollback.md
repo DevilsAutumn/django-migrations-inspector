@@ -68,10 +68,14 @@ The default text output is designed for large rollback plans:
 3. Why other apps are included
 4. App impact summary
 5. Top risky migrations
+6. Grouped guidance for blockers and concerns
 
 Use `--details` to include the full step list and concern list.
 Use `--show-operations` to include reverse operations under each step.
 Use `--why-app APP_LABEL` to focus on one dependency chain.
+
+Detailed text output keeps the incident-response view readable. The step and concern sections show
+the evidence, while repeated recovery advice is printed once in `Guidance`.
 
 ## Current blocker behavior
 

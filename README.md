@@ -53,6 +53,8 @@ The current implementation focuses on:
 3. Analyzing both pending deploy plans and historical migration files with rule-driven risk scoring.
 4. Simulating rollback plans with blockers, blast radius, cross-app impact, and reverse-step previews.
 5. Rendering deterministic text, JSON, Mermaid, and Graphviz DOT reports.
+   Text details keep exact findings separate from deduplicated guidance, so large projects do not
+   repeat the same advice for every matching operation.
 6. Exposing a reusable `migration_inspect` Django management command.
 
 Example usage:

@@ -82,6 +82,9 @@ Use `--details` for the full per-operation finding list:
 python manage.py migration_inspect risk --details
 ```
 
+Detailed text output separates exact findings from guidance. The finding list tells you which
+migration operation was flagged; the guidance section prints each repeated recommendation once.
+
 To audit migration files already on disk, even when nothing is pending:
 
 ```bash
@@ -112,8 +115,11 @@ This reports:
 3. Which migrations will remove tables or columns added after the target migration.
 4. Which migrations restore schema shape without restoring deleted data.
 5. Why other apps are included.
+6. Grouped guidance for the blockers and concerns found.
 
 Use `--details` or `--show-operations` when you need the full rollback plan.
+Rollback details follow the same evidence-first shape: the step and concern lists stay factual,
+while repeated recovery advice is grouped under guidance.
 
 ## Machine-readable output
 
