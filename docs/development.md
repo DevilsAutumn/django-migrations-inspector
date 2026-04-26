@@ -2,14 +2,14 @@
 
 ## Local environment
 
-The repository works best in a Python 3.12 virtual environment during development.
+The repository uses `uv` for maintainer and contributor workflows. Package users can still install
+the published library with `pip`; `uv` is only the internal development tool.
 
 Example:
 
 ```bash
-python3.12 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e '.[dev,docs]'
+python -m pip install uv
+uv sync --python 3.12 --all-groups
 ```
 
 ## Quality commands
@@ -17,12 +17,12 @@ python -m pip install -e '.[dev,docs]'
 Run all core checks before merging:
 
 ```bash
-ruff format .
-ruff format --check .
-ruff check .
-mypy src tests
-pytest -q
-mkdocs build --strict
+uv run ruff format .
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy src tests
+uv run pytest -q
+uv run mkdocs build --strict
 ```
 
 The repository also includes a GitHub Actions workflow at `.github/workflows/ci.yml` that
@@ -33,9 +33,9 @@ enforces the same checks on pushes and pull requests.
 Build and validate release artifacts locally with:
 
 ```bash
-python -m pip install -e '.[release]'
-python -m build
-python -m twine check dist/*
+uv sync --no-default-groups --group release
+uv build
+uv run twine check dist/*
 ```
 
 The repository also includes `.github/workflows/release.yml` for Trusted Publishing.
@@ -53,9 +53,9 @@ Recommended release flow:
 Install docs dependencies and build locally:
 
 ```bash
-python -m pip install -e '.[docs]'
-mkdocs serve
-mkdocs build --strict
+uv sync --no-default-groups --group docs
+uv run mkdocs serve
+uv run mkdocs build --strict
 ```
 
 ## Code style rules
